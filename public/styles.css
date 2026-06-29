@@ -1,0 +1,329 @@
+:root {
+  color-scheme: light;
+  --bg: #f5f4ef;
+  --ink: #232323;
+  --muted: #706d66;
+  --line: #d9d4c8;
+  --panel: #fffefa;
+  --accent: #1f6f5b;
+  --accent-strong: #174f43;
+  --warn: #b24b38;
+  --soft: #e8f0ec;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+.shell {
+  width: min(960px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 56px;
+}
+
+.capture {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(280px, 1.15fr);
+  gap: 28px;
+  align-items: start;
+  padding: 28px 0 22px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+h1 {
+  margin: 0;
+  max-width: 460px;
+  font-size: clamp(34px, 6vw, 64px);
+  line-height: 1.02;
+  letter-spacing: 0;
+}
+
+.composer {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 0 16px 36px rgb(54 48 36 / 8%);
+}
+
+textarea {
+  width: 100%;
+  resize: vertical;
+  border: 0;
+  outline: 0;
+  min-height: 104px;
+  color: var(--ink);
+  background: transparent;
+  line-height: 1.6;
+}
+
+.composerBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.primaryButton,
+.ghostButton,
+.tab,
+.deleteButton,
+.checkButton {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 40px;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+  padding: 0 18px;
+  font-weight: 700;
+}
+
+.primaryButton:hover {
+  background: var(--accent-strong);
+}
+
+.ghostButton,
+.deleteButton {
+  background: transparent;
+  color: var(--muted);
+  padding: 0 14px;
+}
+
+.hint {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.sketchPanel {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 220px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  touch-action: none;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 6px 0 16px;
+}
+
+.reminderBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 2px 0 18px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.reminderBar strong {
+  display: block;
+}
+
+.reminderBar span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.summary div {
+  border-top: 1px solid var(--line);
+  padding: 14px 0;
+}
+
+.summary strong {
+  display: block;
+  font-size: 30px;
+}
+
+.summary span {
+  color: var(--muted);
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+}
+
+.tab {
+  background: transparent;
+  color: var(--muted);
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+.tab.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: white;
+}
+
+.conflicts {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid #e0b9ae;
+  border-radius: 8px;
+  background: #fff7f4;
+  color: var(--warn);
+}
+
+.reminderNotice {
+  position: sticky;
+  top: 10px;
+  z-index: 2;
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  border: 1px solid #b8cfc6;
+  border-radius: 8px;
+  background: #eff8f4;
+  color: var(--accent-strong);
+  box-shadow: 0 10px 22px rgb(35 35 35 / 10%);
+}
+
+.taskList {
+  display: grid;
+  gap: 10px;
+}
+
+.task {
+  display: grid;
+  grid-template-columns: 42px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.task.done {
+  opacity: 0.62;
+}
+
+.checkButton {
+  width: 34px;
+  min-height: 34px;
+  border-radius: 50%;
+  background: var(--soft);
+}
+
+.task.done .checkButton::after {
+  content: "✓";
+  display: block;
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+.taskText {
+  margin: 2px 0 6px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.task.done .taskText {
+  text-decoration: line-through;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pill {
+  background: var(--soft);
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.pill.warn {
+  background: #fff0ea;
+  color: var(--warn);
+}
+
+.pill.remindSoon {
+  background: #fff4cf;
+  color: #765400;
+}
+
+.sketchPreview {
+  display: block;
+  width: min(280px, 100%);
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.empty {
+  padding: 26px 0;
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    width: min(100% - 24px, 960px);
+    padding-top: 18px;
+  }
+
+  .capture {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .reminderBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .task {
+    grid-template-columns: 38px 1fr;
+  }
+
+  .deleteButton {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

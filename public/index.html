@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>个人待办提醒助手</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="capture">
+        <div>
+          <p class="eyebrow">个人待办提醒助手</p>
+          <h1>想到什么，先放进这里。</h1>
+        </div>
+        <form id="taskForm" class="composer">
+          <textarea id="taskText" rows="3" placeholder="例如：明天上午 10 点交电费；周五前回复老王；有空整理桌面"></textarea>
+          <div class="composerBar">
+            <button type="button" id="sketchToggle" class="ghostButton">画个草图</button>
+            <button type="submit" class="primaryButton">记下来</button>
+          </div>
+          <div id="sketchPanel" class="sketchPanel" hidden>
+            <canvas id="sketchCanvas" width="640" height="260" aria-label="草图画板"></canvas>
+            <div class="composerBar">
+              <button type="button" id="clearSketch" class="ghostButton">清空草图</button>
+              <span class="hint">鼠标或手指都可以画</span>
+            </div>
+          </div>
+          <p id="parseHint" class="hint">会识别：今天、明天、后天、周五、上午 10 点、晚上 8:30、6月30日、提前30分钟提醒。</p>
+        </form>
+      </section>
+
+      <section class="reminderBar" aria-label="提醒状态">
+        <div>
+          <strong>提醒</strong>
+          <span id="reminderStatus">默认提前 2 分钟，网页开着时生效。</span>
+        </div>
+        <button type="button" id="enableReminders" class="ghostButton">开启声音和弹窗</button>
+      </section>
+
+      <section class="summary" aria-label="概览">
+        <div>
+          <strong id="todayCount">0</strong>
+          <span>今天</span>
+        </div>
+        <div>
+          <strong id="laterCount">0</strong>
+          <span>以后</span>
+        </div>
+        <div>
+          <strong id="overdueCount">0</strong>
+          <span>过期</span>
+        </div>
+      </section>
+
+      <nav class="tabs" aria-label="筛选">
+        <button class="tab active" data-filter="active">要做</button>
+        <button class="tab" data-filter="today">今天</button>
+        <button class="tab" data-filter="later">以后</button>
+        <button class="tab" data-filter="done">已完成</button>
+      </nav>
+
+      <section id="conflicts" class="conflicts" hidden></section>
+      <section id="reminderNotice" class="reminderNotice" hidden></section>
+      <section id="taskList" class="taskList" aria-live="polite"></section>
+    </main>
+
+    <template id="taskTemplate">
+      <article class="task">
+        <button class="checkButton" type="button" aria-label="标记完成"></button>
+        <div class="taskBody">
+          <p class="taskText"></p>
+          <div class="meta"></div>
+          <img class="sketchPreview" alt="草图预览" hidden>
+        </div>
+        <button class="deleteButton" type="button" aria-label="删除">删除</button>
+      </article>
+    </template>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>

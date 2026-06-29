@@ -1,0 +1,11 @@
+# 本地服务保存的数据，不能上传到 GitHub
+data/
+
+# 依赖和临时文件
+node_modules/
+.DS_Store
+npm-debug.log*
+
+# 本地环境配置
+.env
+.env.*
