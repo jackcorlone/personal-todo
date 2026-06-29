@@ -13,8 +13,40 @@
           <p class="eyebrow">个人待办提醒助手</p>
           <h1>想到什么，先放进这里。</h1>
         </div>
+      </section>
+
+      <section class="captureInput">
         <form id="taskForm" class="composer">
+          <div class="modeSwitch" aria-label="记录类型">
+            <button type="button" class="modeButton active" data-mode="task">待办</button>
+            <button type="button" class="modeButton" data-mode="expense">记账</button>
+          </div>
           <textarea id="taskText" rows="3" placeholder="例如：明天上午 10 点交电费；周五前回复老王；有空整理桌面"></textarea>
+          <div id="expenseFields" class="inlineFields" hidden>
+            <label>
+              金额
+              <input id="expenseAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="38.5">
+            </label>
+            <label>
+              分类
+              <input id="expenseCategory" type="text" placeholder="买菜、交通、咖啡">
+            </label>
+          </div>
+          <div class="inlineFields">
+            <label>
+              重复
+              <select id="repeatRule">
+                <option value="none">不重复</option>
+                <option value="daily">每天</option>
+                <option value="weekly">每周</option>
+                <option value="monthly">每月</option>
+              </select>
+            </label>
+            <label>
+              次数
+              <input id="repeatCount" type="number" min="1" max="99" step="1" placeholder="不限">
+            </label>
+          </div>
           <div class="composerBar">
             <button type="button" id="sketchToggle" class="ghostButton">画个草图</button>
             <button type="submit" class="primaryButton">记下来</button>
@@ -27,6 +59,15 @@
             </div>
           </div>
           <p id="parseHint" class="hint">会识别：今天、明天、后天、周五、上午 10 点、晚上 8:30、6月30日、提前30分钟提醒。</p>
+        </form>
+      </section>
+
+      <section class="toolStrip" aria-label="实用工具">
+        <form id="calculatorForm" class="calculator">
+          <label for="calculatorInput">计算器</label>
+          <input id="calculatorInput" type="text" inputmode="decimal" placeholder="例如：38.5 + 12 * 2">
+          <button type="submit" class="ghostButton">计算</button>
+          <strong id="calculatorResult"></strong>
         </form>
       </section>
 
@@ -51,12 +92,18 @@
           <strong id="overdueCount">0</strong>
           <span>过期</span>
         </div>
+        <div>
+          <strong id="expenseTotal">0</strong>
+          <span>本月支出</span>
+        </div>
       </section>
 
       <nav class="tabs" aria-label="筛选">
         <button class="tab active" data-filter="active">要做</button>
         <button class="tab" data-filter="today">今天</button>
         <button class="tab" data-filter="later">以后</button>
+        <button class="tab" data-filter="expense">记账</button>
+        <button class="tab" data-filter="history">历史</button>
         <button class="tab" data-filter="done">已完成</button>
       </nav>
 

@@ -64,9 +64,17 @@ function cleanTask(input, existing = {}) {
   if (!text) return null;
   return {
     id: existing.id || crypto.randomUUID(),
+    type: input.type || existing.type || "task",
     text: text.slice(0, 300),
     dueAt: input.dueAt === undefined ? existing.dueAt || null : input.dueAt,
     reminderMinutes: Number(input.reminderMinutes ?? existing.reminderMinutes ?? 2),
+    amount: input.amount === undefined ? existing.amount ?? null : input.amount,
+    category: String(input.category || existing.category || "").slice(0, 40),
+    repeat: input.repeat || existing.repeat || "none",
+    repeatCount: input.repeatCount === undefined || input.repeatCount === "" ? existing.repeatCount ?? null : Number(input.repeatCount),
+    reminderRuns: Number(input.reminderRuns ?? existing.reminderRuns ?? 0),
+    reminderHistory: Array.isArray(input.reminderHistory) ? input.reminderHistory : existing.reminderHistory || [],
+    remindedAt: input.remindedAt === undefined ? existing.remindedAt || null : input.remindedAt,
     note: String(input.note || existing.note || "").slice(0, 1000),
     sketch: input.sketch === undefined ? existing.sketch || "" : String(input.sketch || ""),
     done: Boolean(input.done ?? existing.done ?? false),

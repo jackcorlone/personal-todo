@@ -24,6 +24,8 @@ body {
 }
 
 button,
+input,
+select,
 textarea {
   font: inherit;
 }
@@ -35,11 +37,11 @@ textarea {
 }
 
 .capture {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.85fr) minmax(280px, 1.15fr);
-  gap: 28px;
-  align-items: start;
-  padding: 28px 0 22px;
+  padding: 28px 0 18px;
+}
+
+.captureInput {
+  margin-bottom: 16px;
 }
 
 .eyebrow {
@@ -50,7 +52,7 @@ textarea {
 
 h1 {
   margin: 0;
-  max-width: 460px;
+  max-width: 760px;
   font-size: clamp(34px, 6vw, 64px);
   line-height: 1.02;
   letter-spacing: 0;
@@ -75,12 +77,84 @@ textarea {
   line-height: 1.6;
 }
 
+.modeSwitch {
+  display: inline-flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 4px;
+  background: var(--soft);
+  border-radius: 8px;
+}
+
+.modeButton {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 14px;
+}
+
+.modeButton.active {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgb(35 35 35 / 10%);
+}
+
+.inlineFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.inlineFields label,
+.calculator label {
+  color: var(--muted);
+  display: grid;
+  font-size: 13px;
+  gap: 5px;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--ink);
+  padding: 0 10px;
+}
+
 .composerBar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-top: 12px;
+}
+
+.toolStrip {
+  margin: 0 0 14px;
+}
+
+.calculator {
+  display: grid;
+  grid-template-columns: 1fr minmax(180px, 1.6fr) auto minmax(80px, auto);
+  gap: 10px;
+  align-items: end;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.calculator strong {
+  min-height: 40px;
+  align-content: center;
+  color: var(--accent-strong);
 }
 
 .primaryButton,
@@ -137,7 +211,7 @@ canvas {
 
 .summary {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
   margin: 6px 0 16px;
 }
@@ -287,6 +361,11 @@ canvas {
   color: #765400;
 }
 
+.pill.money {
+  background: #e9f4ff;
+  color: #1f5a89;
+}
+
 .sketchPreview {
   display: block;
   width: min(280px, 100%);
@@ -308,14 +387,15 @@ canvas {
     padding-top: 18px;
   }
 
-  .capture {
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-
   .reminderBar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .summary,
+  .inlineFields,
+  .calculator {
+    grid-template-columns: 1fr;
   }
 
   .task {

@@ -7,9 +7,19 @@ const conflicts = document.querySelector("#conflicts");
 const todayCount = document.querySelector("#todayCount");
 const laterCount = document.querySelector("#laterCount");
 const overdueCount = document.querySelector("#overdueCount");
+const expenseTotal = document.querySelector("#expenseTotal");
 const sketchToggle = document.querySelector("#sketchToggle");
 const sketchPanel = document.querySelector("#sketchPanel");
 const clearSketch = document.querySelector("#clearSketch");
+const modeButtons = document.querySelectorAll(".modeButton");
+const expenseFields = document.querySelector("#expenseFields");
+const expenseAmount = document.querySelector("#expenseAmount");
+const expenseCategory = document.querySelector("#expenseCategory");
+const repeatRule = document.querySelector("#repeatRule");
+const repeatCount = document.querySelector("#repeatCount");
+const calculatorForm = document.querySelector("#calculatorForm");
+const calculatorInput = document.querySelector("#calculatorInput");
+const calculatorResult = document.querySelector("#calculatorResult");
 const canvas = document.querySelector("#sketchCanvas");
 const context = canvas.getContext("2d");
 const enableReminders = document.querySelector("#enableReminders");
@@ -22,6 +32,7 @@ const defaultReminderMinutes = 2;
 
 let tasks = [];
 let filter = "active";
+let mode = "task";
 let drawing = false;
 let hasSketch = false;
 let audioReady = false;
@@ -100,6 +111,18 @@ function parseReminderMinutes(text) {
   return match[2] === "小时" ? value * 60 : value;
 }
 
+function parseRepeat(text) {
+  if (/每天|每日/.test(text)) return "daily";
+  if (/每周|每星期/.test(text)) return "weekly";
+  if (/每月/.test(text)) return "monthly";
+  return "none";
+}
+
+function parseAmount(text) {
+  const match = text.match(/(?:花了|支出|收入|记账)?\s*(-?\d+(?:\.\d{1,2})?)\s*(?:元|块)?/);
+  return match ? Number(match[1]) : null;
+}
+
 function chineseNumber(text) {
   const map = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
   if (text === "十") return 10;
@@ -122,6 +145,7 @@ function formatDue(iso) {
 }
 
 function bucket(task) {
+  if (task.type === "expense") return "expense";
   if (task.done) return "done";
   if (!task.dueAt) return "later";
   const due = new Date(task.dueAt);
@@ -130,6 +154,18 @@ function bucket(task) {
   if (due < new Date()) return "overdue";
   if (due >= today && due < tomorrow) return "today";
   return "later";
+}
+
+function hasHistory(task) {
+  return task.done || Boolean(task.remindedAt) || Boolean(task.reminderHistory?.length);
+}
+
+function nextRepeatDate(iso, rule) {
+  const date = new Date(iso);
+  if (rule === "daily") date.setDate(date.getDate() + 1);
+  if (rule === "weekly") date.setDate(date.getDate() + 7);
+  if (rule === "monthly") date.setMonth(date.getMonth() + 1);
+  return date.toISOString();
 }
 
 function reminderTime(task) {
@@ -166,9 +202,17 @@ function localCleanTask(input, existing = {}) {
   if (!text) throw new Error("事情内容不能为空");
   return {
     id: existing.id || crypto.randomUUID(),
+    type: input.type || existing.type || "task",
     text: text.slice(0, 300),
     dueAt: input.dueAt === undefined ? existing.dueAt || null : input.dueAt,
     reminderMinutes: Number(input.reminderMinutes ?? existing.reminderMinutes ?? defaultReminderMinutes),
+    amount: input.amount === undefined ? existing.amount ?? null : input.amount,
+    category: String(input.category || existing.category || "").slice(0, 40),
+    repeat: input.repeat || existing.repeat || "none",
+    repeatCount: input.repeatCount === undefined || input.repeatCount === "" ? existing.repeatCount ?? null : Number(input.repeatCount),
+    reminderRuns: Number(input.reminderRuns ?? existing.reminderRuns ?? 0),
+    reminderHistory: Array.isArray(input.reminderHistory) ? input.reminderHistory : existing.reminderHistory || [],
+    remindedAt: input.remindedAt === undefined ? existing.remindedAt || null : input.remindedAt,
     note: String(input.note || existing.note || "").slice(0, 1000),
     sketch: input.sketch === undefined ? existing.sketch || "" : String(input.sketch || ""),
     done: Boolean(input.done ?? existing.done ?? false),
@@ -218,7 +262,8 @@ async function loadTasks() {
 }
 
 function matchingTasks() {
-  if (filter === "active") return tasks.filter((task) => !task.done);
+  if (filter === "active") return tasks.filter((task) => task.type !== "expense" && !task.done);
+  if (filter === "history") return tasks.filter(hasHistory);
   return tasks.filter((task) => bucket(task) === filter);
 }
 
@@ -226,6 +271,13 @@ function renderSummary() {
   todayCount.textContent = tasks.filter((task) => bucket(task) === "today").length;
   laterCount.textContent = tasks.filter((task) => bucket(task) === "later").length;
   overdueCount.textContent = tasks.filter((task) => bucket(task) === "overdue").length;
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const total = tasks
+    .filter((task) => task.type === "expense" && new Date(task.createdAt) >= monthStart)
+    .reduce((sum, task) => sum + Number(task.amount || 0), 0);
+  expenseTotal.textContent = total.toFixed(total % 1 ? 2 : 0);
 }
 
 function renderConflicts() {
@@ -276,14 +328,37 @@ function render() {
       const meta = node.querySelector(".meta");
       const pill = document.createElement("span");
       pill.className = `pill ${bucket(task) === "overdue" ? "warn" : ""}`;
-      pill.textContent = formatDue(task.dueAt);
+      pill.textContent = task.type === "expense" ? "记账" : formatDue(task.dueAt);
       meta.append(pill);
+
+      if (task.type === "expense") {
+        const moneyPill = document.createElement("span");
+        moneyPill.className = "pill money";
+        moneyPill.textContent = `${task.category || "未分类"} ${Number(task.amount || 0).toFixed(2)} 元`;
+        meta.append(moneyPill);
+      }
 
       if (task.dueAt && !task.done) {
         const remindPill = document.createElement("span");
         remindPill.className = "pill remindSoon";
         remindPill.textContent = `提前 ${task.reminderMinutes ?? defaultReminderMinutes} 分钟提醒`;
         meta.append(remindPill);
+      }
+
+      if (task.repeat && task.repeat !== "none") {
+        const repeatPill = document.createElement("span");
+        repeatPill.className = "pill";
+        const repeatName = { daily: "每天", weekly: "每周", monthly: "每月" }[task.repeat];
+        const limit = task.repeatCount ? `，共 ${task.repeatCount} 次` : "";
+        repeatPill.textContent = `${repeatName}重复${limit}`;
+        meta.append(repeatPill);
+      }
+
+      if (task.reminderHistory?.length) {
+        const historyPill = document.createElement("span");
+        historyPill.className = "pill";
+        historyPill.textContent = `已提醒 ${task.reminderHistory.length} 次`;
+        meta.append(historyPill);
       }
 
       if (task.sketch) {
@@ -353,21 +428,40 @@ function showReminder(task) {
   }, 30000);
 }
 
-function checkReminders() {
+async function applyReminder(task) {
+  const history = [...(task.reminderHistory || []), new Date().toISOString()];
+  const nextRuns = Number(task.reminderRuns || 0) + 1;
+  const shouldRepeat = task.repeat && task.repeat !== "none" && (!task.repeatCount || nextRuns < task.repeatCount);
+  const patch = {
+    remindedAt: new Date().toISOString(),
+    reminderHistory: history,
+    reminderRuns: nextRuns
+  };
+
+  if (shouldRepeat) {
+    patch.dueAt = nextRepeatDate(task.dueAt, task.repeat);
+  }
+
+  await updateTask(task, patch);
+}
+
+async function checkReminders() {
   const now = new Date();
   const ids = remindedIds();
   let changed = false;
 
-  tasks.forEach((task) => {
-    if (task.done || !task.dueAt || ids.has(task.id)) return;
+  for (const task of tasks) {
+    const reminderKey = `${task.id}:${task.dueAt}`;
+    if (task.done || task.type === "expense" || !task.dueAt || ids.has(reminderKey)) continue;
     const remindAt = reminderTime(task);
     const dueAt = new Date(task.dueAt);
     if (remindAt && now >= remindAt && now <= dueAt) {
-      ids.add(task.id);
+      ids.add(reminderKey);
       changed = true;
       showReminder(task);
+      await applyReminder(task);
     }
-  });
+  }
 
   if (changed) saveRemindedIds(ids);
 }
@@ -417,18 +511,31 @@ form.addEventListener("submit", async (event) => {
   const text = textInput.value.trim();
   if (!text) return;
 
+  const selectedMode = mode === "expense" || /^记账/.test(text) ? "expense" : "task";
+  const dueAt = parseTime(text);
+  const amount = selectedMode === "expense" ? Number(expenseAmount.value || parseAmount(text) || 0) : null;
+
   const task = await api("/api/tasks", {
     method: "POST",
     body: JSON.stringify({
+      type: selectedMode,
       text,
-      dueAt: parseTime(text),
+      dueAt: selectedMode === "expense" ? null : dueAt,
       reminderMinutes: parseReminderMinutes(text),
+      amount,
+      category: selectedMode === "expense" ? expenseCategory.value.trim() : "",
+      repeat: repeatRule.value !== "none" ? repeatRule.value : parseRepeat(text),
+      repeatCount: repeatCount.value,
       sketch: hasSketch ? canvas.toDataURL("image/png") : ""
     })
   });
 
   tasks.unshift(task);
   textInput.value = "";
+  expenseAmount.value = "";
+  expenseCategory.value = "";
+  repeatRule.value = "none";
+  repeatCount.value = "";
   resetCanvas();
   sketchPanel.hidden = true;
   render();
@@ -439,6 +546,31 @@ tabs.forEach((tab) => {
     filter = tab.dataset.filter;
     render();
   });
+});
+
+modeButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    mode = button.dataset.mode;
+    modeButtons.forEach((item) => item.classList.toggle("active", item === button));
+    expenseFields.hidden = mode !== "expense";
+    textInput.placeholder = mode === "expense" ? "例如：买菜、咖啡、交通" : "例如：明天上午 10 点交电费；周五前回复老王；有空整理桌面";
+  });
+});
+
+calculatorForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const expression = calculatorInput.value.trim();
+  if (!expression) return;
+  if (!/^[\d+\-*/().\s]+$/.test(expression)) {
+    calculatorResult.textContent = "只能计算数字";
+    return;
+  }
+  try {
+    const value = Function(`"use strict"; return (${expression})`)();
+    calculatorResult.textContent = Number.isFinite(value) ? String(Math.round(value * 100) / 100) : "算不出";
+  } catch {
+    calculatorResult.textContent = "格式不对";
+  }
 });
 
 sketchToggle.addEventListener("click", () => {
