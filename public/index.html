@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>个人待办提醒助手</title>
-    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./styles.css?v=0.2.1">
   </head>
   <body>
     <main class="shell">
@@ -21,6 +21,7 @@
             <button type="button" class="modeButton active" data-mode="task">待办</button>
             <button type="button" class="modeButton" data-mode="expense">记账</button>
           </div>
+          <p id="modeStatus" class="modeStatus">当前是待办模式，可以记录提醒、重复事项和临时想法。</p>
           <textarea id="taskText" rows="3" placeholder="例如：明天上午 10 点交电费；周五前回复老王；有空整理桌面"></textarea>
           <div id="expenseFields" class="inlineFields" hidden>
             <label>
@@ -67,7 +68,7 @@
           <label for="calculatorInput">计算器</label>
           <input id="calculatorInput" type="text" inputmode="decimal" placeholder="例如：38.5 + 12 * 2">
           <button type="submit" class="ghostButton">计算</button>
-          <strong id="calculatorResult"></strong>
+          <strong id="calculatorResult">结果</strong>
         </form>
       </section>
 
@@ -124,6 +125,6 @@
       </article>
     </template>
 
-    <script src="./app.js" type="module"></script>
+    <script src="./app.js?v=0.2.1" type="module"></script>
   </body>
 </html>

@@ -12,6 +12,7 @@ const sketchToggle = document.querySelector("#sketchToggle");
 const sketchPanel = document.querySelector("#sketchPanel");
 const clearSketch = document.querySelector("#clearSketch");
 const modeButtons = document.querySelectorAll(".modeButton");
+const modeStatus = document.querySelector("#modeStatus");
 const expenseFields = document.querySelector("#expenseFields");
 const expenseAmount = document.querySelector("#expenseAmount");
 const expenseCategory = document.querySelector("#expenseCategory");
@@ -36,6 +37,7 @@ let mode = "task";
 let drawing = false;
 let hasSketch = false;
 let audioReady = false;
+let remindersEnabled = false;
 let audioContext = null;
 
 context.lineCap = "round";
@@ -446,6 +448,7 @@ async function applyReminder(task) {
 }
 
 async function checkReminders() {
+  if (!remindersEnabled) return;
   const now = new Date();
   const ids = remindedIds();
   let changed = false;
@@ -464,6 +467,24 @@ async function checkReminders() {
   }
 
   if (changed) saveRemindedIds(ids);
+}
+
+function calculateExpression() {
+  const expression = calculatorInput.value.trim();
+  if (!expression) {
+    calculatorResult.textContent = "结果";
+    return;
+  }
+  if (!/^[\d+\-*/().\s]+$/.test(expression)) {
+    calculatorResult.textContent = "只能计算数字";
+    return;
+  }
+  try {
+    const value = Function(`"use strict"; return (${expression})`)();
+    calculatorResult.textContent = Number.isFinite(value) ? String(Math.round(value * 100) / 100) : "算不出";
+  } catch {
+    calculatorResult.textContent = "格式不对";
+  }
 }
 
 async function deleteTask(task) {
@@ -553,25 +574,18 @@ modeButtons.forEach((button) => {
     mode = button.dataset.mode;
     modeButtons.forEach((item) => item.classList.toggle("active", item === button));
     expenseFields.hidden = mode !== "expense";
+    modeStatus.textContent = mode === "expense" ? "当前是记账模式，填写金额和分类后会计入本月支出。" : "当前是待办模式，可以记录提醒、重复事项和临时想法。";
     textInput.placeholder = mode === "expense" ? "例如：买菜、咖啡、交通" : "例如：明天上午 10 点交电费；周五前回复老王；有空整理桌面";
+    if (mode === "expense") expenseAmount.focus();
   });
 });
 
 calculatorForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  const expression = calculatorInput.value.trim();
-  if (!expression) return;
-  if (!/^[\d+\-*/().\s]+$/.test(expression)) {
-    calculatorResult.textContent = "只能计算数字";
-    return;
-  }
-  try {
-    const value = Function(`"use strict"; return (${expression})`)();
-    calculatorResult.textContent = Number.isFinite(value) ? String(Math.round(value * 100) / 100) : "算不出";
-  } catch {
-    calculatorResult.textContent = "格式不对";
-  }
+  calculateExpression();
 });
+
+calculatorInput.addEventListener("input", calculateExpression);
 
 sketchToggle.addEventListener("click", () => {
   sketchPanel.hidden = !sketchPanel.hidden;
@@ -579,12 +593,24 @@ sketchToggle.addEventListener("click", () => {
 
 clearSketch.addEventListener("click", resetCanvas);
 enableReminders.addEventListener("click", async () => {
+  if (remindersEnabled) {
+    remindersEnabled = false;
+    audioReady = false;
+    reminderStatus.textContent = "已关闭。不会响铃，也不会弹出系统通知。";
+    enableReminders.textContent = "开启声音和弹窗";
+    enableReminders.classList.remove("active");
+    return;
+  }
+
+  remindersEnabled = true;
   audioReady = true;
   audioContext ||= new AudioContext();
   await audioContext.resume();
   if ("Notification" in window && Notification.permission === "default") {
     await Notification.requestPermission();
   }
+  enableReminders.textContent = "关闭声音和弹窗";
+  enableReminders.classList.add("active");
   reminderStatus.textContent = "已开启。保持这个网页打开，到提醒时间会响一声并弹出提示。";
   checkReminders();
 });

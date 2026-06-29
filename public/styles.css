@@ -15,6 +15,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -102,6 +106,12 @@ textarea {
   box-shadow: 0 1px 4px rgb(35 35 35 / 10%);
 }
 
+.modeStatus {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .inlineFields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -185,6 +195,12 @@ select {
   background: transparent;
   color: var(--muted);
   padding: 0 14px;
+}
+
+.ghostButton.active {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  background: var(--soft);
 }
 
 .hint {
