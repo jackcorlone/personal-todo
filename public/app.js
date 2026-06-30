@@ -16,11 +16,21 @@ const modeStatus = document.querySelector("#modeStatus");
 const expenseFields = document.querySelector("#expenseFields");
 const expenseAmount = document.querySelector("#expenseAmount");
 const expenseCategory = document.querySelector("#expenseCategory");
+const taskTags = document.querySelector("#taskTags");
+const reminderMinutesInput = document.querySelector("#reminderMinutesInput");
 const repeatRule = document.querySelector("#repeatRule");
 const repeatCount = document.querySelector("#repeatCount");
+const saveTask = document.querySelector("#saveTask");
+const cancelEdit = document.querySelector("#cancelEdit");
 const calculatorForm = document.querySelector("#calculatorForm");
 const calculatorInput = document.querySelector("#calculatorInput");
 const calculatorResult = document.querySelector("#calculatorResult");
+const exportData = document.querySelector("#exportData");
+const importData = document.querySelector("#importData");
+const importFile = document.querySelector("#importFile");
+const dataStatus = document.querySelector("#dataStatus");
+const searchInput = document.querySelector("#searchInput");
+const clearSearch = document.querySelector("#clearSearch");
 const canvas = document.querySelector("#sketchCanvas");
 const context = canvas.getContext("2d");
 const enableReminders = document.querySelector("#enableReminders");
@@ -50,6 +60,8 @@ let audioContext = null;
 let selectedDateKey = "";
 let calendarMode = "month";
 let activeReminderTaskId = null;
+let editingTaskId = null;
+let searchTerm = "";
 
 context.lineCap = "round";
 context.lineJoin = "round";
@@ -88,6 +100,10 @@ function parseClock(text, fallbackHour = 9) {
     hour = 15;
   } else if (/中午/.test(text)) {
     hour = 12;
+  } else if (/明早|明天早上/.test(text)) {
+    hour = 9;
+  } else if (/今晚|睡前/.test(text)) {
+    hour = 21;
   } else if (/早上|上午/.test(text)) {
     hour = 9;
   }
@@ -123,7 +139,9 @@ function parseTime(text) {
 
   if (/今天/.test(text)) day = startOfDay(now);
   if (/明天/.test(text)) day = addDays(startOfDay(now), 1);
+  if (/明早|明天早上/.test(text)) day = addDays(startOfDay(now), 1);
   if (/后天/.test(text)) day = addDays(startOfDay(now), 2);
+  if (/今晚|睡前/.test(text)) day = startOfDay(now);
 
   const dateMatch = text.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?/);
   if (dateMatch) {
@@ -134,6 +152,16 @@ function parseTime(text) {
   if (monthlyMatch) {
     day = new Date(now.getFullYear(), now.getMonth(), Number(monthlyMatch[1]));
     if (day < now) day.setMonth(day.getMonth() + 1);
+  }
+
+  const nextMonthMatch = text.match(/下个?月\s*(\d{1,2})\s*[日号]?/);
+  if (nextMonthMatch) {
+    day = new Date(now.getFullYear(), now.getMonth() + 1, Number(nextMonthMatch[1]));
+  }
+
+  if (/月底|月末/.test(text)) {
+    day = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    if (day < now) day = new Date(now.getFullYear(), now.getMonth() + 2, 0);
   }
 
   const weekMatch = text.match(/周([一二三四五六日天])/);
@@ -177,9 +205,25 @@ function parseRepeat(text) {
   return "none";
 }
 
+function parseWeekdays(text) {
+  const match = text.match(/每周([一二三四五六日天]+)|每星期([一二三四五六日天]+)/);
+  if (!match) return [];
+  const chars = (match[1] || match[2] || "").split("");
+  const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 0, 天: 0 };
+  return [...new Set(chars.map((char) => map[char]).filter((day) => day !== undefined))];
+}
+
 function parseAmount(text) {
   const match = text.match(/(?:花了|支出|收入|记账)?\s*(-?\d+(?:\.\d{1,2})?)\s*(?:元|块)?/);
   return match ? Number(match[1]) : null;
+}
+
+function parseTags(value) {
+  return String(value || "")
+    .split(/[,，\s]+/)
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .slice(0, 12);
 }
 
 function chineseNumber(text) {
@@ -227,6 +271,16 @@ function nextRepeatDate(iso, rule) {
   return date.toISOString();
 }
 
+function nextWeekdayRepeat(iso, weekdays) {
+  if (!weekdays?.length) return null;
+  const current = new Date(iso);
+  for (let offset = 1; offset <= 14; offset += 1) {
+    const candidate = addDays(current, offset);
+    if (weekdays.includes(candidate.getDay())) return candidate.toISOString();
+  }
+  return null;
+}
+
 function reminderTime(task) {
   if (!task.dueAt) return null;
   return new Date(new Date(task.dueAt).getTime() - (task.reminderMinutes ?? defaultReminderMinutes) * 60 * 1000);
@@ -265,6 +319,8 @@ function localCleanTask(input, existing = {}) {
     text: text.slice(0, 300),
     dueAt: input.dueAt === undefined ? existing.dueAt || null : input.dueAt,
     reminderMinutes: Number(input.reminderMinutes ?? existing.reminderMinutes ?? defaultReminderMinutes),
+    tags: Array.isArray(input.tags) ? input.tags.slice(0, 12) : existing.tags || [],
+    weekdays: Array.isArray(input.weekdays) ? input.weekdays.slice(0, 7) : existing.weekdays || [],
     amount: input.amount === undefined ? existing.amount ?? null : input.amount,
     category: String(input.category || existing.category || "").slice(0, 40),
     repeat: input.repeat || existing.repeat || "none",
@@ -321,10 +377,23 @@ async function loadTasks() {
 }
 
 function matchingTasks() {
-  if (selectedDateKey) return tasksForDate(selectedDateKey).filter((task) => !task.done);
-  if (filter === "active") return tasks.filter((task) => task.type !== "expense" && !task.done);
-  if (filter === "history") return tasks.filter(hasHistory);
-  return tasks.filter((task) => bucket(task) === filter);
+  let visible;
+  if (selectedDateKey) {
+    visible = tasksForDate(selectedDateKey).filter((task) => !task.done);
+  } else if (filter === "active") {
+    visible = tasks.filter((task) => task.type !== "expense" && !task.done);
+  } else if (filter === "history") {
+    visible = tasks.filter(hasHistory);
+  } else {
+    visible = tasks.filter((task) => bucket(task) === filter);
+  }
+
+  if (!searchTerm) return visible;
+  const needle = searchTerm.toLowerCase();
+  return visible.filter((task) => {
+    const haystack = [task.text, task.category, ...(task.tags || [])].join(" ").toLowerCase();
+    return haystack.includes(needle);
+  });
 }
 
 function renderSummary() {
@@ -450,6 +519,7 @@ function render() {
       node.querySelector(".taskText").textContent = task.text;
       node.querySelector(".checkButton").addEventListener("click", () => updateTask(task, { done: !task.done }));
       node.querySelector(".deleteButton").addEventListener("click", () => deleteTask(task));
+      node.querySelector(".editButton").addEventListener("click", () => startEdit(task));
 
       const meta = node.querySelector(".meta");
       const pill = document.createElement("span");
@@ -475,8 +545,10 @@ function render() {
         const repeatPill = document.createElement("span");
         repeatPill.className = "pill";
         const repeatName = { daily: "每天", weekly: "每周", monthly: "每月" }[task.repeat];
+        const weekdayNames = ["日", "一", "二", "三", "四", "五", "六"];
+        const weekdays = task.weekdays?.length ? ` ${task.weekdays.map((day) => weekdayNames[day]).join("")}` : "";
         const limit = task.repeatCount ? `，共 ${task.repeatCount} 次` : "";
-        repeatPill.textContent = `${repeatName}重复${limit}`;
+        repeatPill.textContent = `${repeatName}${weekdays}重复${limit}`;
         meta.append(repeatPill);
       }
 
@@ -486,6 +558,13 @@ function render() {
         historyPill.textContent = `已提醒 ${task.reminderHistory.length} 次`;
         meta.append(historyPill);
       }
+
+      (task.tags || []).forEach((tag) => {
+        const tagPill = document.createElement("span");
+        tagPill.className = "pill";
+        tagPill.textContent = `#${tag}`;
+        meta.append(tagPill);
+      });
 
       if (task.sketch) {
         const image = node.querySelector(".sketchPreview");
@@ -504,6 +583,44 @@ async function updateTask(task, patch) {
   });
   tasks = tasks.map((item) => item.id === task.id ? updated : item);
   render();
+}
+
+function setMode(nextMode) {
+  mode = nextMode;
+  modeButtons.forEach((item) => item.classList.toggle("active", item.dataset.mode === mode));
+  expenseFields.hidden = mode !== "expense";
+  modeStatus.textContent = mode === "expense" ? "当前是记账模式，填写金额和分类后会计入本月支出。" : "当前是待办模式，可以记录提醒、重复事项和临时想法。";
+  textInput.placeholder = mode === "expense" ? "例如：买菜、咖啡、交通" : "例如：明天上午 10 点交电费；周五前回复老王；有空整理桌面";
+}
+
+function resetForm() {
+  editingTaskId = null;
+  textInput.value = "";
+  expenseAmount.value = "";
+  expenseCategory.value = "";
+  taskTags.value = "";
+  reminderMinutesInput.value = "";
+  repeatRule.value = "none";
+  repeatCount.value = "";
+  saveTask.textContent = "记下来";
+  cancelEdit.hidden = true;
+  setMode("task");
+}
+
+function startEdit(task) {
+  editingTaskId = task.id;
+  setMode(task.type === "expense" ? "expense" : "task");
+  textInput.value = task.text || "";
+  expenseAmount.value = task.amount ?? "";
+  expenseCategory.value = task.category || "";
+  taskTags.value = (task.tags || []).join(", ");
+  reminderMinutesInput.value = task.reminderMinutes ?? "";
+  repeatRule.value = task.repeat || "none";
+  repeatCount.value = task.repeatCount ?? "";
+  saveTask.textContent = "保存修改";
+  cancelEdit.hidden = false;
+  textInput.focus();
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function remindedIds() {
@@ -590,7 +707,7 @@ async function handleReminderAction(action) {
 
   if (action === "skip") {
     if (task.repeat && task.repeat !== "none" && task.dueAt) {
-      await moveTaskDue(task, nextRepeatDate(task.dueAt, task.repeat));
+      await moveTaskDue(task, nextWeekdayRepeat(task.dueAt, task.weekdays) || nextRepeatDate(task.dueAt, task.repeat));
     }
   }
 
@@ -608,7 +725,7 @@ async function applyReminder(task) {
   };
 
   if (shouldRepeat) {
-    patch.dueAt = nextRepeatDate(task.dueAt, task.repeat);
+    patch.dueAt = nextWeekdayRepeat(task.dueAt, task.weekdays) || nextRepeatDate(task.dueAt, task.repeat);
   }
 
   await updateTask(task, patch);
@@ -651,6 +768,55 @@ function calculateExpression() {
     calculatorResult.textContent = Number.isFinite(value) ? String(Math.round(value * 100) / 100) : "算不出";
   } catch {
     calculatorResult.textContent = "格式不对";
+  }
+}
+
+function exportBackup() {
+  const backup = {
+    app: "personal-todo",
+    version: "0.4.0",
+    exportedAt: new Date().toISOString(),
+    tasks
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `personal-todo-backup-${dateKey(new Date())}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+  dataStatus.textContent = `已导出 ${tasks.length} 条记录。`;
+}
+
+async function importBackup(file) {
+  try {
+    const raw = await file.text();
+    const parsed = JSON.parse(raw);
+    const imported = Array.isArray(parsed) ? parsed : parsed.tasks;
+    if (!Array.isArray(imported)) throw new Error("备份格式不对");
+    const cleaned = [];
+    imported.forEach((task) => {
+      try {
+        cleaned.push(localCleanTask(task, task));
+      } catch {
+        // Ignore malformed rows in user-provided backup files.
+      }
+    });
+    if (hasServer) {
+      tasks = await api("/api/tasks", {
+        method: "PUT",
+        body: JSON.stringify({ tasks: cleaned })
+      });
+    } else {
+      tasks = cleaned;
+      localWriteTasks(tasks);
+    }
+    dataStatus.textContent = `已导入 ${tasks.length} 条记录。`;
+    render();
+  } catch {
+    dataStatus.textContent = "导入失败，请确认是 JSON 备份文件。";
+  } finally {
+    importFile.value = "";
   }
 }
 
@@ -702,28 +868,35 @@ form.addEventListener("submit", async (event) => {
   const selectedMode = mode === "expense" || /^记账/.test(text) ? "expense" : "task";
   const dueAt = parseTime(text);
   const amount = selectedMode === "expense" ? Number(expenseAmount.value || parseAmount(text) || 0) : null;
+  const existing = editingTaskId ? tasks.find((task) => task.id === editingTaskId) : null;
+  const reminderMinutes = reminderMinutesInput.value === "" ? parseReminderMinutes(text) : Number(reminderMinutesInput.value);
+  const weekdays = parseWeekdays(text);
 
-  const task = await api("/api/tasks", {
-    method: "POST",
-    body: JSON.stringify({
-      type: selectedMode,
-      text,
-      dueAt: selectedMode === "expense" ? null : dueAt,
-      reminderMinutes: parseReminderMinutes(text),
-      amount,
-      category: selectedMode === "expense" ? expenseCategory.value.trim() : "",
-      repeat: repeatRule.value !== "none" ? repeatRule.value : parseRepeat(text),
-      repeatCount: repeatCount.value,
-      sketch: hasSketch ? canvas.toDataURL("image/png") : ""
-    })
-  });
+  const payload = {
+    type: selectedMode,
+    text,
+    dueAt: selectedMode === "expense" ? null : dueAt || existing?.dueAt || null,
+    reminderMinutes,
+    tags: parseTags(taskTags.value),
+    weekdays: weekdays.length ? weekdays : existing?.weekdays || [],
+    amount,
+    category: selectedMode === "expense" ? expenseCategory.value.trim() : "",
+    repeat: repeatRule.value !== "none" ? repeatRule.value : parseRepeat(text),
+    repeatCount: repeatCount.value,
+    sketch: hasSketch ? canvas.toDataURL("image/png") : existing?.sketch || ""
+  };
 
-  tasks.unshift(task);
-  textInput.value = "";
-  expenseAmount.value = "";
-  expenseCategory.value = "";
-  repeatRule.value = "none";
-  repeatCount.value = "";
+  if (existing) {
+    await updateTask(existing, payload);
+  } else {
+    const task = await api("/api/tasks", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    tasks.unshift(task);
+  }
+
+  resetForm();
   resetCanvas();
   sketchPanel.hidden = true;
   render();
@@ -761,13 +934,15 @@ reminderActions.forEach((button) => {
 
 modeButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    mode = button.dataset.mode;
-    modeButtons.forEach((item) => item.classList.toggle("active", item === button));
-    expenseFields.hidden = mode !== "expense";
-    modeStatus.textContent = mode === "expense" ? "当前是记账模式，填写金额和分类后会计入本月支出。" : "当前是待办模式，可以记录提醒、重复事项和临时想法。";
-    textInput.placeholder = mode === "expense" ? "例如：买菜、咖啡、交通" : "例如：明天上午 10 点交电费；周五前回复老王；有空整理桌面";
+    setMode(button.dataset.mode);
     if (mode === "expense") expenseAmount.focus();
   });
+});
+
+cancelEdit.addEventListener("click", () => {
+  resetForm();
+  resetCanvas();
+  sketchPanel.hidden = true;
 });
 
 calculatorForm.addEventListener("submit", (event) => {
@@ -776,6 +951,21 @@ calculatorForm.addEventListener("submit", (event) => {
 });
 
 calculatorInput.addEventListener("input", calculateExpression);
+exportData.addEventListener("click", exportBackup);
+importData.addEventListener("click", () => importFile.click());
+importFile.addEventListener("change", () => {
+  const [file] = importFile.files;
+  if (file) importBackup(file);
+});
+searchInput.addEventListener("input", () => {
+  searchTerm = searchInput.value.trim();
+  render();
+});
+clearSearch.addEventListener("click", () => {
+  searchInput.value = "";
+  searchTerm = "";
+  render();
+});
 
 sketchToggle.addEventListener("click", () => {
   sketchPanel.hidden = !sketchPanel.hidden;

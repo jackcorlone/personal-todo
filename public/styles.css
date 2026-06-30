@@ -157,6 +157,14 @@ select {
   margin-top: 12px;
 }
 
+.formActions,
+.dataActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .toolStrip {
   margin: 0 0 14px;
 }
@@ -178,10 +186,37 @@ select {
   color: var(--accent-strong);
 }
 
+.dataBar,
+.searchBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.dataBar strong {
+  display: block;
+}
+
+.dataBar span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.searchBar input {
+  flex: 1;
+}
+
 .primaryButton,
 .ghostButton,
 .tab,
 .deleteButton,
+.editButton,
 .checkButton {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -202,7 +237,8 @@ select {
 }
 
 .ghostButton,
-.deleteButton {
+.deleteButton,
+.editButton {
   background: transparent;
   color: var(--muted);
   padding: 0 14px;
@@ -429,7 +465,7 @@ canvas {
 
 .task {
   display: grid;
-  grid-template-columns: 42px 1fr auto;
+  grid-template-columns: 42px 1fr auto auto;
   gap: 12px;
   align-items: start;
   background: var(--panel);
@@ -521,6 +557,18 @@ canvas {
     flex-direction: column;
   }
 
+  .composerBar,
+  .dataBar,
+  .searchBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .formActions,
+  .dataActions {
+    justify-content: flex-start;
+  }
+
   .calendarToolbar {
     align-items: stretch;
     flex-direction: column;
@@ -550,7 +598,8 @@ canvas {
     grid-template-columns: 38px 1fr;
   }
 
-  .deleteButton {
+  .deleteButton,
+  .editButton {
     grid-column: 2;
     justify-self: start;
   }

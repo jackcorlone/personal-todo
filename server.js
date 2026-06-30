@@ -68,6 +68,8 @@ function cleanTask(input, existing = {}) {
     text: text.slice(0, 300),
     dueAt: input.dueAt === undefined ? existing.dueAt || null : input.dueAt,
     reminderMinutes: Number(input.reminderMinutes ?? existing.reminderMinutes ?? 2),
+    tags: Array.isArray(input.tags) ? input.tags.slice(0, 12) : existing.tags || [],
+    weekdays: Array.isArray(input.weekdays) ? input.weekdays.slice(0, 7) : existing.weekdays || [],
     amount: input.amount === undefined ? existing.amount ?? null : input.amount,
     category: String(input.category || existing.category || "").slice(0, 40),
     repeat: input.repeat || existing.repeat || "none",
@@ -100,6 +102,15 @@ async function handleApi(request, response, url) {
     tasks.unshift(task);
     await writeTasks(tasks);
     send(response, 201, task);
+    return true;
+  }
+
+  if (request.method === "PUT" && url.pathname === "/api/tasks") {
+    const body = await readBody(request);
+    const imported = Array.isArray(body.tasks) ? body.tasks : [];
+    const cleaned = imported.map((task) => cleanTask(task)).filter(Boolean);
+    await writeTasks(cleaned);
+    send(response, 200, cleaned);
     return true;
   }
 

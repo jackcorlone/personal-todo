@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>个人待办提醒助手</title>
-    <link rel="stylesheet" href="./styles.css?v=0.3.0">
+    <link rel="stylesheet" href="./styles.css?v=0.4.0">
   </head>
   <body>
     <main class="shell">
@@ -23,6 +23,16 @@
           </div>
           <p id="modeStatus" class="modeStatus">当前是待办模式，可以记录提醒、重复事项和临时想法。</p>
           <textarea id="taskText" rows="3" placeholder="例如：明天上午 10 点交电费；周五前回复老王；有空整理桌面"></textarea>
+          <div class="inlineFields">
+            <label>
+              标签
+              <input id="taskTags" type="text" placeholder="工作, 股票, 家庭">
+            </label>
+            <label>
+              提前提醒
+              <input id="reminderMinutesInput" type="number" min="0" max="1440" step="1" placeholder="默认2分钟">
+            </label>
+          </div>
           <div id="expenseFields" class="inlineFields" hidden>
             <label>
               金额
@@ -50,7 +60,10 @@
           </div>
           <div class="composerBar">
             <button type="button" id="sketchToggle" class="ghostButton">画个草图</button>
-            <button type="submit" class="primaryButton">记下来</button>
+            <div class="formActions">
+              <button type="button" id="cancelEdit" class="ghostButton" hidden>取消编辑</button>
+              <button type="submit" id="saveTask" class="primaryButton">记下来</button>
+            </div>
           </div>
           <div id="sketchPanel" class="sketchPanel" hidden>
             <canvas id="sketchCanvas" width="640" height="260" aria-label="草图画板"></canvas>
@@ -59,7 +72,7 @@
               <span class="hint">鼠标或手指都可以画</span>
             </div>
           </div>
-          <p id="parseHint" class="hint">会识别：今天、明天、后天、周五、上午 10 点、晚上 8:30、6月30日、提前30分钟提醒。</p>
+          <p id="parseHint" class="hint">会识别：今晚、明早、半小时后、下周一、每周一三五、月底、提前30分钟提醒。</p>
         </form>
       </section>
 
@@ -70,6 +83,18 @@
           <button type="submit" class="ghostButton">计算</button>
           <strong id="calculatorResult">结果</strong>
         </form>
+      </section>
+
+      <section class="dataBar" aria-label="本地数据">
+        <div>
+          <strong>本地数据</strong>
+          <span id="dataStatus">可以导出备份，也可以导入之前的备份文件。</span>
+        </div>
+        <div class="dataActions">
+          <button type="button" id="exportData" class="ghostButton">导出备份</button>
+          <button type="button" id="importData" class="ghostButton">导入备份</button>
+          <input id="importFile" type="file" accept="application/json" hidden>
+        </div>
       </section>
 
       <section class="reminderBar" aria-label="提醒状态">
@@ -108,6 +133,11 @@
         <button class="tab" data-filter="done">已完成</button>
       </nav>
 
+      <section class="searchBar" aria-label="搜索">
+        <input id="searchInput" type="search" placeholder="搜索内容或标签，例如：股票、家庭、账单">
+        <button type="button" id="clearSearch" class="ghostButton">清空</button>
+      </section>
+
       <section id="conflicts" class="conflicts" hidden></section>
       <section class="calendarPanel" aria-label="日历">
         <div class="calendarToolbar">
@@ -144,9 +174,10 @@
           <img class="sketchPreview" alt="草图预览" hidden>
         </div>
         <button class="deleteButton" type="button" aria-label="删除">删除</button>
+        <button class="editButton" type="button" aria-label="编辑">编辑</button>
       </article>
     </template>
 
-    <script src="./app.js?v=0.3.0" type="module"></script>
+    <script src="./app.js?v=0.4.0" type="module"></script>
   </body>
 </html>
