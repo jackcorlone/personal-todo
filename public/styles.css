@@ -309,6 +309,108 @@ canvas {
   box-shadow: 0 10px 22px rgb(35 35 35 / 10%);
 }
 
+.reminderActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.calendarPanel {
+  margin: 0 0 14px;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.calendarToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.calendarToolbar strong {
+  display: block;
+}
+
+.calendarToolbar span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.calendarControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calendarDay,
+.calendarWeekday {
+  min-height: 54px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--ink);
+  padding: 7px;
+  text-align: left;
+}
+
+.calendarWeekday {
+  min-height: 30px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.calendarDay {
+  cursor: pointer;
+}
+
+.calendarDay.muted {
+  opacity: 0.45;
+}
+
+.calendarDay.today {
+  border-color: var(--accent);
+}
+
+.calendarDay.selected {
+  background: var(--soft);
+  border-color: var(--accent);
+}
+
+.calendarDate {
+  display: block;
+  font-weight: 700;
+}
+
+.calendarCount {
+  display: inline-block;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--accent-strong);
+  font-size: 12px;
+  padding: 2px 7px;
+}
+
+.calendarCount.warn {
+  background: #fff0ea;
+  color: var(--warn);
+}
+
 .taskList {
   display: grid;
   gap: 10px;
@@ -406,6 +508,25 @@ canvas {
   .reminderBar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .calendarToolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .calendarControls {
+    justify-content: flex-start;
+  }
+
+  .calendarGrid {
+    gap: 4px;
+  }
+
+  .calendarDay,
+  .calendarWeekday {
+    min-height: 42px;
+    padding: 5px;
   }
 
   .summary,

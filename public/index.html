@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>个人待办提醒助手</title>
-    <link rel="stylesheet" href="./styles.css?v=0.2.1">
+    <link rel="stylesheet" href="./styles.css?v=0.3.0">
   </head>
   <body>
     <main class="shell">
@@ -109,7 +109,29 @@
       </nav>
 
       <section id="conflicts" class="conflicts" hidden></section>
-      <section id="reminderNotice" class="reminderNotice" hidden></section>
+      <section class="calendarPanel" aria-label="日历">
+        <div class="calendarToolbar">
+          <div>
+            <strong id="calendarTitle">本月</strong>
+            <span id="selectedDayLabel">选择日期查看事项</span>
+          </div>
+          <div class="calendarControls">
+            <button type="button" class="ghostButton" id="calendarToday">今天</button>
+            <button type="button" class="ghostButton" id="calendarWeek">本周</button>
+            <button type="button" class="ghostButton active" id="calendarMonth">月历</button>
+          </div>
+        </div>
+        <div id="calendarGrid" class="calendarGrid"></div>
+      </section>
+      <section id="reminderNotice" class="reminderNotice" hidden>
+        <div id="reminderMessage"></div>
+        <div class="reminderActions">
+          <button type="button" class="ghostButton" data-reminder-action="complete">完成</button>
+          <button type="button" class="ghostButton" data-reminder-action="snooze">延后10分钟</button>
+          <button type="button" class="ghostButton" data-reminder-action="tomorrow">明天再提醒</button>
+          <button type="button" class="ghostButton" data-reminder-action="skip">跳过本次</button>
+        </div>
+      </section>
       <section id="taskList" class="taskList" aria-live="polite"></section>
     </main>
 
@@ -125,6 +147,6 @@
       </article>
     </template>
 
-    <script src="./app.js?v=0.2.1" type="module"></script>
+    <script src="./app.js?v=0.3.0" type="module"></script>
   </body>
 </html>

@@ -26,6 +26,14 @@ const context = canvas.getContext("2d");
 const enableReminders = document.querySelector("#enableReminders");
 const reminderStatus = document.querySelector("#reminderStatus");
 const reminderNotice = document.querySelector("#reminderNotice");
+const reminderMessage = document.querySelector("#reminderMessage");
+const reminderActions = document.querySelectorAll("[data-reminder-action]");
+const calendarTitle = document.querySelector("#calendarTitle");
+const selectedDayLabel = document.querySelector("#selectedDayLabel");
+const calendarGrid = document.querySelector("#calendarGrid");
+const calendarToday = document.querySelector("#calendarToday");
+const calendarWeek = document.querySelector("#calendarWeek");
+const calendarMonth = document.querySelector("#calendarMonth");
 const storageKey = "personal-todo.tasks";
 const reminderStorageKey = "personal-todo.reminded";
 const hasServer = location.protocol !== "file:";
@@ -39,6 +47,9 @@ let hasSketch = false;
 let audioReady = false;
 let remindersEnabled = false;
 let audioContext = null;
+let selectedDateKey = "";
+let calendarMode = "month";
+let activeReminderTaskId = null;
 
 context.lineCap = "round";
 context.lineJoin = "round";
@@ -57,35 +68,18 @@ function addDays(date, days) {
   return copy;
 }
 
-function parseTime(text) {
-  const now = new Date();
-  let day = null;
+function dateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
-  if (/今天/.test(text)) day = startOfDay(now);
-  if (/明天/.test(text)) day = addDays(startOfDay(now), 1);
-  if (/后天/.test(text)) day = addDays(startOfDay(now), 2);
-
-  const dateMatch = text.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?/);
-  if (dateMatch) {
-    day = new Date(now.getFullYear(), Number(dateMatch[1]) - 1, Number(dateMatch[2]));
-  }
-
-  const weekMatch = text.match(/周([一二三四五六日天])/);
-  if (weekMatch) {
-    const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 0, 天: 0 };
-    const target = map[weekMatch[1]];
-    const current = now.getDay();
-    let offset = (target - current + 7) % 7;
-    if (offset === 0) offset = 7;
-    day = addDays(startOfDay(now), offset);
-  }
-
-  if (!day) return null;
-
-  let hour = 9;
+function parseClock(text, fallbackHour = 9) {
+  let hour = fallbackHour;
   let minute = 0;
-  const timeMatch = text.match(/(\d{1,2})(?:[:：点](\d{1,2})?)?\s*(?:分)?/);
-  if (timeMatch && !dateMatch?.[0].includes(timeMatch[0])) {
+  const timeMatch = text.match(/(\d{1,2})(?:[:：点](\d{1,2})?)\s*(?:分)?/);
+  if (timeMatch) {
     hour = Number(timeMatch[1]);
     minute = Number(timeMatch[2] || 0);
   } else if (/晚上|夜里/.test(text)) {
@@ -99,7 +93,70 @@ function parseTime(text) {
   }
 
   if ((/下午|晚上|夜里/.test(text)) && hour < 12) hour += 12;
-  day.setHours(Math.min(hour, 23), Math.min(minute, 59), 0, 0);
+  return {
+    hour: Math.min(hour, 23),
+    minute: Math.min(minute, 59)
+  };
+}
+
+function nextWeekday(target, from = new Date(), forceNextWeek = false) {
+  if (forceNextWeek) {
+    const startNextWeek = addDays(startOfDay(from), 7 - ((from.getDay() + 6) % 7));
+    return addDays(startNextWeek, target === 0 ? 6 : target - 1);
+  }
+  const current = from.getDay();
+  let offset = (target - current + 7) % 7;
+  if (offset === 0) offset = 7;
+  return addDays(startOfDay(from), offset);
+}
+
+function parseTime(text) {
+  const now = new Date();
+  let day = null;
+
+  const afterMatch = text.match(/(半个?小时|\d{1,3})\s*(分钟|分|小时|个?小时)\s*后/);
+  if (afterMatch) {
+    const amount = afterMatch[1].includes("半") ? 30 : Number(afterMatch[1]);
+    const minutes = /小时/.test(afterMatch[2]) ? amount * 60 : amount;
+    return new Date(now.getTime() + minutes * 60 * 1000).toISOString();
+  }
+
+  if (/今天/.test(text)) day = startOfDay(now);
+  if (/明天/.test(text)) day = addDays(startOfDay(now), 1);
+  if (/后天/.test(text)) day = addDays(startOfDay(now), 2);
+
+  const dateMatch = text.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?/);
+  if (dateMatch) {
+    day = new Date(now.getFullYear(), Number(dateMatch[1]) - 1, Number(dateMatch[2]));
+  }
+
+  const monthlyMatch = text.match(/每个?月\s*(\d{1,2})\s*[日号]/);
+  if (monthlyMatch) {
+    day = new Date(now.getFullYear(), now.getMonth(), Number(monthlyMatch[1]));
+    if (day < now) day.setMonth(day.getMonth() + 1);
+  }
+
+  const weekMatch = text.match(/周([一二三四五六日天])/);
+  if (weekMatch) {
+    const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 0, 天: 0 };
+    const target = map[weekMatch[1]];
+    day = nextWeekday(target, now, /下周/.test(text));
+  }
+
+  if (/工作日/.test(text)) {
+    const clock = parseClock(text);
+    const candidate = startOfDay(now);
+    candidate.setHours(clock.hour, clock.minute, 0, 0);
+    day = candidate > now && ![0, 6].includes(candidate.getDay()) ? startOfDay(now) : addDays(startOfDay(now), 1);
+    while ([0, 6].includes(day.getDay())) {
+      day = addDays(day, 1);
+    }
+  }
+
+  if (!day) return null;
+
+  const { hour, minute } = parseClock(text);
+  day.setHours(hour, minute, 0, 0);
   return day.toISOString();
 }
 
@@ -116,7 +173,7 @@ function parseReminderMinutes(text) {
 function parseRepeat(text) {
   if (/每天|每日/.test(text)) return "daily";
   if (/每周|每星期/.test(text)) return "weekly";
-  if (/每月/.test(text)) return "monthly";
+  if (/每月|每个月/.test(text)) return "monthly";
   return "none";
 }
 
@@ -264,6 +321,7 @@ async function loadTasks() {
 }
 
 function matchingTasks() {
+  if (selectedDateKey) return tasksForDate(selectedDateKey).filter((task) => !task.done);
   if (filter === "active") return tasks.filter((task) => task.type !== "expense" && !task.done);
   if (filter === "history") return tasks.filter(hasHistory);
   return tasks.filter((task) => bucket(task) === filter);
@@ -300,9 +358,75 @@ function renderConflicts() {
   conflicts.textContent = `有 ${pairs.length} 组事情时间接近，可能会冲突。`;
 }
 
+function tasksForDate(key) {
+  return tasks.filter((task) => task.type !== "expense" && task.dueAt && dateKey(new Date(task.dueAt)) === key);
+}
+
+function renderCalendar() {
+  const now = new Date();
+  const todayKey = dateKey(now);
+  let days = [];
+
+  if (calendarMode === "today") {
+    days = [startOfDay(now)];
+    calendarTitle.textContent = "今天";
+  } else if (calendarMode === "week") {
+    const start = addDays(startOfDay(now), -((now.getDay() + 6) % 7));
+    days = Array.from({ length: 7 }, (_, index) => addDays(start, index));
+    calendarTitle.textContent = "本周";
+  } else {
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const offset = (monthStart.getDay() + 6) % 7;
+    const gridStart = addDays(monthStart, -offset);
+    days = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+    calendarTitle.textContent = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long" }).format(now);
+  }
+
+  calendarGrid.innerHTML = "";
+  ["一", "二", "三", "四", "五", "六", "日"].forEach((label) => {
+    const weekday = document.createElement("div");
+    weekday.className = "calendarWeekday";
+    weekday.textContent = label;
+    calendarGrid.append(weekday);
+  });
+
+  days.forEach((day) => {
+    const key = dateKey(day);
+    const dayTasks = tasksForDate(key).filter((task) => !task.done);
+    const overdue = dayTasks.filter((task) => new Date(task.dueAt) < now).length;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "calendarDay";
+    button.classList.toggle("today", key === todayKey);
+    button.classList.toggle("selected", key === selectedDateKey);
+    button.classList.toggle("muted", calendarMode === "month" && day.getMonth() !== now.getMonth());
+    button.innerHTML = `<span class="calendarDate">${day.getDate()}</span>`;
+
+    if (dayTasks.length) {
+      const count = document.createElement("span");
+      count.className = `calendarCount ${overdue ? "warn" : ""}`;
+      count.textContent = overdue ? `${dayTasks.length} / ${overdue}过期` : `${dayTasks.length} 件`;
+      button.append(count);
+    }
+
+    button.addEventListener("click", () => {
+      selectedDateKey = selectedDateKey === key ? "" : key;
+      filter = selectedDateKey ? "active" : filter;
+      render();
+    });
+    calendarGrid.append(button);
+  });
+
+  selectedDayLabel.textContent = selectedDateKey ? `${selectedDateKey} 的待办` : "选择日期查看事项";
+  calendarToday.classList.toggle("active", calendarMode === "today");
+  calendarWeek.classList.toggle("active", calendarMode === "week");
+  calendarMonth.classList.toggle("active", calendarMode === "month");
+}
+
 function render() {
   renderSummary();
   renderConflicts();
+  renderCalendar();
   list.innerHTML = "";
   const visible = matchingTasks();
 
@@ -418,7 +542,8 @@ function playReminderSound() {
 function showReminder(task) {
   const message = `提醒：${task.text}（${formatDue(task.dueAt)}）`;
   reminderNotice.hidden = false;
-  reminderNotice.textContent = message;
+  reminderMessage.textContent = message;
+  activeReminderTaskId = task.id;
   playReminderSound();
 
   if ("Notification" in window && Notification.permission === "granted") {
@@ -426,8 +551,50 @@ function showReminder(task) {
   }
 
   setTimeout(() => {
-    if (reminderNotice.textContent === message) reminderNotice.hidden = true;
+    if (reminderMessage.textContent === message) reminderNotice.hidden = true;
   }, 30000);
+}
+
+function hideReminder() {
+  reminderNotice.hidden = true;
+  activeReminderTaskId = null;
+}
+
+function moveTaskDue(task, nextDueAt) {
+  return updateTask(task, {
+    dueAt: nextDueAt,
+    remindedAt: null
+  });
+}
+
+async function handleReminderAction(action) {
+  const task = tasks.find((item) => item.id === activeReminderTaskId);
+  if (!task) {
+    hideReminder();
+    return;
+  }
+
+  if (action === "complete") {
+    await updateTask(task, { done: true });
+  }
+
+  if (action === "snooze") {
+    await moveTaskDue(task, new Date(Date.now() + 10 * 60 * 1000).toISOString());
+  }
+
+  if (action === "tomorrow") {
+    const next = addDays(new Date(), 1);
+    next.setSeconds(0, 0);
+    await moveTaskDue(task, next.toISOString());
+  }
+
+  if (action === "skip") {
+    if (task.repeat && task.repeat !== "none" && task.dueAt) {
+      await moveTaskDue(task, nextRepeatDate(task.dueAt, task.repeat));
+    }
+  }
+
+  hideReminder();
 }
 
 async function applyReminder(task) {
@@ -564,9 +731,32 @@ form.addEventListener("submit", async (event) => {
 
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => {
+    selectedDateKey = "";
     filter = tab.dataset.filter;
     render();
   });
+});
+
+calendarToday.addEventListener("click", () => {
+  calendarMode = "today";
+  selectedDateKey = dateKey(new Date());
+  render();
+});
+
+calendarWeek.addEventListener("click", () => {
+  calendarMode = "week";
+  selectedDateKey = "";
+  render();
+});
+
+calendarMonth.addEventListener("click", () => {
+  calendarMode = "month";
+  selectedDateKey = "";
+  render();
+});
+
+reminderActions.forEach((button) => {
+  button.addEventListener("click", () => handleReminderAction(button.dataset.reminderAction));
 });
 
 modeButtons.forEach((button) => {
