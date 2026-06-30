@@ -349,6 +349,12 @@ async function localApi(path, options = {}) {
     return task;
   }
 
+  if (method === "PUT" && path === "/api/tasks") {
+    const imported = Array.isArray(body.tasks) ? body.tasks : [];
+    localWriteTasks(imported);
+    return imported;
+  }
+
   const match = path.match(/^\/api\/tasks\/([^/]+)$/);
   if (!match) throw new Error("无效操作");
 
@@ -863,43 +869,55 @@ function endDraw() {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const text = textInput.value.trim();
-  if (!text) return;
-
-  const selectedMode = mode === "expense" || /^记账/.test(text) ? "expense" : "task";
-  const dueAt = parseTime(text);
-  const amount = selectedMode === "expense" ? Number(expenseAmount.value || parseAmount(text) || 0) : null;
-  const existing = editingTaskId ? tasks.find((task) => task.id === editingTaskId) : null;
-  const reminderMinutes = reminderMinutesInput.value === "" ? parseReminderMinutes(text) : Number(reminderMinutesInput.value);
-  const weekdays = parseWeekdays(text);
-
-  const payload = {
-    type: selectedMode,
-    text,
-    dueAt: selectedMode === "expense" ? null : dueAt || existing?.dueAt || null,
-    reminderMinutes,
-    tags: parseTags(taskTags.value),
-    weekdays: weekdays.length ? weekdays : existing?.weekdays || [],
-    amount,
-    category: selectedMode === "expense" ? expenseCategory.value.trim() : "",
-    repeat: repeatRule.value !== "none" ? repeatRule.value : parseRepeat(text),
-    repeatCount: repeatCount.value,
-    sketch: hasSketch ? canvas.toDataURL("image/png") : existing?.sketch || ""
-  };
-
-  if (existing) {
-    await updateTask(existing, payload);
-  } else {
-    const task = await api("/api/tasks", {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
-    tasks.unshift(task);
+  if (!text) {
+    dataStatus.textContent = "请先写下要保存的内容。";
+    return;
   }
 
-  resetForm();
-  resetCanvas();
-  sketchPanel.hidden = true;
-  render();
+  try {
+    const selectedMode = mode === "expense" || /^记账/.test(text) ? "expense" : "task";
+    const dueAt = parseTime(text);
+    const amount = selectedMode === "expense" ? Number(expenseAmount.value || parseAmount(text) || 0) : null;
+    const existing = editingTaskId ? tasks.find((task) => task.id === editingTaskId) : null;
+    const reminderMinutes = reminderMinutesInput.value === "" ? parseReminderMinutes(text) : Number(reminderMinutesInput.value);
+    const weekdays = parseWeekdays(text);
+
+    const payload = {
+      type: selectedMode,
+      text,
+      dueAt: selectedMode === "expense" ? null : dueAt || existing?.dueAt || null,
+      reminderMinutes,
+      tags: parseTags(taskTags.value),
+      weekdays: weekdays.length ? weekdays : existing?.weekdays || [],
+      amount,
+      category: selectedMode === "expense" ? expenseCategory.value.trim() : "",
+      repeat: repeatRule.value !== "none" ? repeatRule.value : parseRepeat(text),
+      repeatCount: repeatCount.value,
+      sketch: hasSketch ? canvas.toDataURL("image/png") : existing?.sketch || ""
+    };
+
+    if (existing) {
+      await updateTask(existing, payload);
+    } else {
+      const task = await api("/api/tasks", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      tasks.unshift(task);
+    }
+
+    resetForm();
+    resetCanvas();
+    sketchPanel.hidden = true;
+    selectedDateKey = "";
+    searchInput.value = "";
+    searchTerm = "";
+    filter = selectedMode === "expense" ? "expense" : "active";
+    dataStatus.textContent = "已保存。";
+    render();
+  } catch {
+    dataStatus.textContent = "保存失败，请刷新页面后再试。";
+  }
 });
 
 tabs.forEach((tab) => {
