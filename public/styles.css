@@ -127,6 +127,10 @@ textarea {
   gap: 5px;
 }
 
+.inlineFields label {
+  grid-template-rows: 20px 48px;
+}
+
 input,
 select {
   width: 100%;
@@ -136,6 +140,13 @@ select {
   background: white;
   color: var(--ink);
   padding: 0 10px;
+}
+
+.inlineFields input,
+.inlineFields select {
+  height: 48px;
+  min-height: 48px;
+  line-height: 48px;
 }
 
 .composerBar {
