@@ -29,6 +29,8 @@ const exportData = document.querySelector("#exportData");
 const importData = document.querySelector("#importData");
 const importFile = document.querySelector("#importFile");
 const dataStatus = document.querySelector("#dataStatus");
+const pwaStatus = document.querySelector("#pwaStatus");
+const installApp = document.querySelector("#installApp");
 const searchInput = document.querySelector("#searchInput");
 const clearSearch = document.querySelector("#clearSearch");
 const canvas = document.querySelector("#sketchCanvas");
@@ -46,6 +48,8 @@ const calendarWeek = document.querySelector("#calendarWeek");
 const calendarMonth = document.querySelector("#calendarMonth");
 const storageKey = "personal-todo.tasks";
 const reminderStorageKey = "personal-todo.reminded";
+const databaseName = "personal-todo";
+const databaseStore = "kv";
 const hasServer = location.protocol !== "file:";
 const defaultReminderMinutes = 2;
 
@@ -62,6 +66,7 @@ let calendarMode = "month";
 let activeReminderTaskId = null;
 let editingTaskId = null;
 let searchTerm = "";
+let installPrompt = null;
 
 context.lineCap = "round";
 context.lineJoin = "round";
@@ -286,6 +291,38 @@ function reminderTime(task) {
   return new Date(new Date(task.dueAt).getTime() - (task.reminderMinutes ?? defaultReminderMinutes) * 60 * 1000);
 }
 
+function openDatabase() {
+  if (!("indexedDB" in window)) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const request = indexedDB.open(databaseName, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(databaseStore);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+  });
+}
+
+async function localDatabaseRead(key) {
+  const database = await openDatabase();
+  if (!database) return null;
+  return new Promise((resolve) => {
+    const transaction = database.transaction(databaseStore, "readonly");
+    const request = transaction.objectStore(databaseStore).get(key);
+    request.onsuccess = () => resolve(request.result ?? null);
+    request.onerror = () => resolve(null);
+  });
+}
+
+async function localDatabaseWrite(key, value) {
+  const database = await openDatabase();
+  if (!database) return false;
+  return new Promise((resolve) => {
+    const transaction = database.transaction(databaseStore, "readwrite");
+    transaction.objectStore(databaseStore).put(value, key);
+    transaction.oncomplete = () => resolve(true);
+    transaction.onerror = () => resolve(false);
+  });
+}
+
 async function api(path, options = {}) {
   if (!hasServer) return localApi(path, options);
 
@@ -297,7 +334,7 @@ async function api(path, options = {}) {
   return response.json();
 }
 
-function localReadTasks() {
+function localReadTasksSync() {
   try {
     const stored = JSON.parse(localStorage.getItem(storageKey) || "[]");
     return Array.isArray(stored) ? stored : [];
@@ -306,8 +343,19 @@ function localReadTasks() {
   }
 }
 
-function localWriteTasks(nextTasks) {
+async function localReadTasks() {
+  const stored = await localDatabaseRead(storageKey);
+  if (Array.isArray(stored)) return stored;
+
+  const legacyTasks = localReadTasksSync();
+  if (legacyTasks.length) await localDatabaseWrite(storageKey, legacyTasks);
+  return legacyTasks;
+}
+
+async function localWriteTasks(nextTasks) {
+  const saved = await localDatabaseWrite(storageKey, nextTasks);
   localStorage.setItem(storageKey, JSON.stringify(nextTasks));
+  return saved;
 }
 
 function localCleanTask(input, existing = {}) {
@@ -338,20 +386,20 @@ function localCleanTask(input, existing = {}) {
 
 async function localApi(path, options = {}) {
   const method = options.method || "GET";
-  const current = localReadTasks();
+  const current = await localReadTasks();
   const body = options.body ? JSON.parse(options.body) : {};
 
   if (method === "GET" && path === "/api/tasks") return current;
 
   if (method === "POST" && path === "/api/tasks") {
     const task = localCleanTask(body);
-    localWriteTasks([task, ...current]);
+    await localWriteTasks([task, ...current]);
     return task;
   }
 
   if (method === "PUT" && path === "/api/tasks") {
     const imported = Array.isArray(body.tasks) ? body.tasks : [];
-    localWriteTasks(imported);
+    await localWriteTasks(imported);
     return imported;
   }
 
@@ -364,13 +412,13 @@ async function localApi(path, options = {}) {
   if (method === "PATCH") {
     const updated = localCleanTask(body, current[index]);
     current[index] = updated;
-    localWriteTasks(current);
+    await localWriteTasks(current);
     return updated;
   }
 
   if (method === "DELETE") {
     const [removed] = current.splice(index, 1);
-    localWriteTasks(current);
+    await localWriteTasks(current);
     return removed;
   }
 
@@ -780,7 +828,7 @@ function calculateExpression() {
 function exportBackup() {
   const backup = {
     app: "personal-todo",
-    version: "0.4.0",
+    version: "0.5.0",
     exportedAt: new Date().toISOString(),
     tasks
   };
@@ -815,7 +863,7 @@ async function importBackup(file) {
       });
     } else {
       tasks = cleaned;
-      localWriteTasks(tasks);
+      await localWriteTasks(tasks);
     }
     dataStatus.textContent = `已导入 ${tasks.length} 条记录。`;
     render();
@@ -1019,5 +1067,47 @@ canvas.addEventListener("touchstart", beginDraw, { passive: false });
 canvas.addEventListener("touchmove", draw, { passive: false });
 window.addEventListener("touchend", endDraw);
 
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event;
+  installApp.hidden = false;
+  pwaStatus.textContent = "可以安装到桌面。安装后像 App 一样打开，数据仍然只在本机。";
+});
+
+window.addEventListener("appinstalled", () => {
+  installPrompt = null;
+  installApp.hidden = true;
+  pwaStatus.textContent = "已安装。可以从桌面图标打开，数据仍然只在本机。";
+});
+
+installApp.addEventListener("click", async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  const result = await installPrompt.userChoice;
+  pwaStatus.textContent = result.outcome === "accepted" ? "已开始安装。" : "已取消安装，可以稍后再装。";
+  installPrompt = null;
+  installApp.hidden = true;
+});
+
+async function registerPwa() {
+  if (location.protocol === "file:") {
+    pwaStatus.textContent = "直接打开文件时可以使用本地数据；如需安装和离线缓存，请用本地服务或 GitHub Pages 打开。";
+    return;
+  }
+
+  if (!("serviceWorker" in navigator)) {
+    pwaStatus.textContent = "这个浏览器暂不支持安装缓存，但网页功能可以正常使用。";
+    return;
+  }
+
+  try {
+    await navigator.serviceWorker.register("./sw.js?v=0.5.0");
+    pwaStatus.textContent = "已支持离线打开。安装入口会在浏览器菜单或地址栏出现。";
+  } catch {
+    pwaStatus.textContent = "离线缓存暂时没有启用，但网页功能可以正常使用。";
+  }
+}
+
 loadTasks();
+registerPwa();
 setInterval(checkReminders, 10000);

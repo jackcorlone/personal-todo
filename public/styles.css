@@ -187,6 +187,7 @@ select {
 }
 
 .dataBar,
+.pwaBar,
 .searchBar {
   display: flex;
   align-items: center;
@@ -203,9 +204,22 @@ select {
   display: block;
 }
 
-.dataBar span {
+.dataBar span,
+.pwaBar span {
   color: var(--muted);
   font-size: 14px;
+}
+
+.pwaBar {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: var(--soft);
+  border: 1px solid #c9ddd4;
+  border-radius: 8px;
+}
+
+.pwaBar strong {
+  display: block;
 }
 
 .searchBar input {
@@ -559,6 +573,7 @@ canvas {
 
   .composerBar,
   .dataBar,
+  .pwaBar,
   .searchBar {
     align-items: stretch;
     flex-direction: column;

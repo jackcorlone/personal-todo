@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="待办助手图标">
+  <rect width="512" height="512" rx="112" fill="#1f6f5b"/>
+  <path fill="#fffefa" d="M158 132h196c28 0 50 22 50 50v172c0 28-22 50-50 50H158c-28 0-50-22-50-50V182c0-28 22-50 50-50Z"/>
+  <path fill="#d9d4c8" d="M166 208h180v32H166zm0 76h132v32H166z"/>
+  <path fill="none" stroke="#1f6f5b" stroke-linecap="round" stroke-linejoin="round" stroke-width="34" d="m174 360 52 50 116-140"/>
+</svg>
