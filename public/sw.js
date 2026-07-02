@@ -1,10 +1,10 @@
-const cacheName = "personal-todo-v0.5.0";
+const cacheName = "personal-todo-v0.5.1";
 const files = [
   "./",
-  "./index.html?v=0.5.0",
-  "./styles.css?v=0.5.0",
-  "./app.js?v=0.5.0",
-  "./manifest.webmanifest?v=0.5.0",
+  "./index.html?v=0.5.1",
+  "./styles.css?v=0.5.1",
+  "./app.js?v=0.5.1",
+  "./manifest.webmanifest?v=0.5.1",
   "./icon.svg",
   "./icon-192.png",
   "./icon-512.png"
@@ -36,6 +36,6 @@ self.addEventListener("fetch", (event) => {
       const copy = response.clone();
       caches.open(cacheName).then((cache) => cache.put(event.request, copy));
       return response;
-    }).catch(() => caches.match("./index.html?v=0.5.0")))
+    }).catch(() => caches.match("./index.html?v=0.5.1")))
   );
 });

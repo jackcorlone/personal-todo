@@ -2,6 +2,7 @@ const form = document.querySelector("#taskForm");
 const textInput = document.querySelector("#taskText");
 const list = document.querySelector("#taskList");
 const template = document.querySelector("#taskTemplate");
+const languageSelect = document.querySelector("#languageSelect");
 const tabs = document.querySelectorAll(".tab");
 const conflicts = document.querySelector("#conflicts");
 const todayCount = document.querySelector("#todayCount");
@@ -48,6 +49,7 @@ const calendarWeek = document.querySelector("#calendarWeek");
 const calendarMonth = document.querySelector("#calendarMonth");
 const storageKey = "personal-todo.tasks";
 const reminderStorageKey = "personal-todo.reminded";
+const languageStorageKey = "personal-todo.language";
 const databaseName = "personal-todo";
 const databaseStore = "kv";
 const hasServer = location.protocol !== "file:";
@@ -67,6 +69,263 @@ let activeReminderTaskId = null;
 let editingTaskId = null;
 let searchTerm = "";
 let installPrompt = null;
+let language = localStorage.getItem(languageStorageKey) || "zh";
+let pwaMessageKey = "pwaDefault";
+
+const messages = {
+  zh: {
+    appTitle: "个人待办提醒助手",
+    hero: "想到什么，先放进这里。",
+    modeTask: "待办",
+    modeExpense: "记账",
+    modeTaskStatus: "当前是待办模式，可以记录提醒、重复事项和临时想法。",
+    modeExpenseStatus: "当前是记账模式，填写金额和分类后会计入本月支出。",
+    taskPlaceholder: "例如：明天上午 10 点交电费；周五前回复老王；有空整理桌面",
+    expensePlaceholder: "例如：买菜、咖啡、交通",
+    labels: {
+      tags: "标签",
+      reminderLead: "提前提醒",
+      amount: "金额",
+      category: "分类",
+      repeat: "重复",
+      repeatCount: "次数",
+      calculator: "计算器"
+    },
+    placeholders: {
+      tags: "工作, 股票, 家庭",
+      reminderLead: "默认2分钟",
+      category: "买菜、交通、咖啡",
+      repeatCount: "不限",
+      calculator: "例如：38.5 + 12 * 2",
+      search: "搜索内容或标签，例如：股票、家庭、账单"
+    },
+    repeatOptions: { none: "不重复", daily: "每天", weekly: "每周", monthly: "每月" },
+    sketch: "画个草图",
+    cancelEdit: "取消编辑",
+    save: "记下来",
+    saveEdit: "保存修改",
+    clearSketch: "清空草图",
+    sketchHint: "鼠标或手指都可以画",
+    parseHint: "会识别：今晚、明早、半小时后、下周一、每周一三五、月底、提前30分钟提醒。",
+    calculate: "计算",
+    result: "结果",
+    dataTitle: "本地数据",
+    dataStatusDefault: "数据保存在这个设备里，可以导出备份，也可以导入之前的备份文件。",
+    exportData: "导出备份",
+    importData: "导入备份",
+    pwaTitle: "安装到桌面",
+    pwaDefault: "正在检查是否可以安装，安装后仍然使用本机数据。",
+    install: "安装",
+    reminderTitle: "提醒",
+    reminderDefault: "默认提前 2 分钟，网页开着时生效。",
+    enableReminders: "开启声音和弹窗",
+    disableReminders: "关闭声音和弹窗",
+    summary: { today: "今天", later: "以后", overdue: "过期", expenseTotal: "本月支出" },
+    tabs: { active: "要做", today: "今天", later: "以后", expense: "记账", history: "历史", done: "已完成" },
+    clear: "清空",
+    calendar: { titleToday: "今天", titleWeek: "本周", selectedDefault: "选择日期查看事项", selected: "的待办", monthView: "月历", weekdays: ["一", "二", "三", "四", "五", "六", "日"], item: "件", overdue: "过期" },
+    reminderActions: { complete: "完成", snooze: "延后10分钟", tomorrow: "明天再提醒", skip: "跳过本次" },
+    taskLabels: { noTime: "没有时间", expense: "记账", uncategorized: "未分类", currency: "元", remindPrefix: "提前", remindSuffix: "分钟提醒", repeatSuffix: "重复", repeatLimit: "共", times: "次", reminded: "已提醒" },
+    buttons: { delete: "删除", edit: "编辑" },
+    empty: "这里暂时没有事情。",
+    conflict: (count) => `有 ${count} 组事情时间接近，可能会冲突。`,
+    reminderMessage: (text, due) => `提醒：${text}（${due}）`,
+    calcNumberOnly: "只能计算数字",
+    calcBadFormat: "格式不对",
+    calcUnknown: "算不出",
+    exported: (count) => `已导出 ${count} 条记录。`,
+    imported: (count) => `已导入 ${count} 条记录。`,
+    importFailed: "导入失败，请确认是 JSON 备份文件。",
+    emptyText: "请先写下要保存的内容。",
+    saved: "已保存。",
+    saveFailed: "保存失败，请刷新页面后再试。",
+    reminderOff: "已关闭。不会响铃，也不会弹出系统通知。",
+    reminderOn: "已开启。保持这个网页打开，到提醒时间会响一声并弹出提示。",
+    pwaReady: "可以安装到桌面。安装后像 App 一样打开，数据仍然只在本机。",
+    pwaInstalled: "已安装。可以从桌面图标打开，数据仍然只在本机。",
+    pwaInstallAccepted: "已开始安装。",
+    pwaInstallDismissed: "已取消安装，可以稍后再装。",
+    pwaFile: "直接打开文件时可以使用本地数据；如需安装和离线缓存，请用本地服务或 GitHub Pages 打开。",
+    pwaUnsupported: "这个浏览器暂不支持安装缓存，但网页功能可以正常使用。",
+    pwaOfflineReady: "已支持离线打开。安装入口会在浏览器菜单或地址栏出现。",
+    pwaOfflineFailed: "离线缓存暂时没有启用，但网页功能可以正常使用。"
+  },
+  en: {
+    appTitle: "Personal Reminder Assistant",
+    hero: "Capture it first. Sort it out later.",
+    modeTask: "To-do",
+    modeExpense: "Expense",
+    modeTaskStatus: "To-do mode: save reminders, repeating tasks, and quick thoughts.",
+    modeExpenseStatus: "Expense mode: enter an amount and category to include it in this month's total.",
+    taskPlaceholder: "Example: pay electricity tomorrow at 10; reply before Friday; tidy the desk",
+    expensePlaceholder: "Example: groceries, coffee, transit",
+    labels: {
+      tags: "Tags",
+      reminderLead: "Remind before",
+      amount: "Amount",
+      category: "Category",
+      repeat: "Repeat",
+      repeatCount: "Times",
+      calculator: "Calculator"
+    },
+    placeholders: {
+      tags: "work, stocks, home",
+      reminderLead: "Default 2 min",
+      category: "groceries, transit, coffee",
+      repeatCount: "Unlimited",
+      calculator: "Example: 38.5 + 12 * 2",
+      search: "Search text or tags, e.g. stocks, home, bills"
+    },
+    repeatOptions: { none: "No repeat", daily: "Daily", weekly: "Weekly", monthly: "Monthly" },
+    sketch: "Sketch",
+    cancelEdit: "Cancel",
+    save: "Save",
+    saveEdit: "Save changes",
+    clearSketch: "Clear sketch",
+    sketchHint: "Draw with mouse or finger",
+    parseHint: "Time parsing currently works best with Chinese phrases like 今天, 明天, 下周一, 提前30分钟提醒.",
+    calculate: "Calculate",
+    result: "Result",
+    dataTitle: "Local data",
+    dataStatusDefault: "Data stays on this device. You can export or import a backup file.",
+    exportData: "Export backup",
+    importData: "Import backup",
+    pwaTitle: "Install",
+    pwaDefault: "Checking install support. Installed mode still uses local data.",
+    install: "Install",
+    reminderTitle: "Reminder",
+    reminderDefault: "Default is 2 minutes before. Works while this page is open.",
+    enableReminders: "Enable sound and popup",
+    disableReminders: "Disable sound and popup",
+    summary: { today: "Today", later: "Later", overdue: "Overdue", expenseTotal: "This month" },
+    tabs: { active: "To-do", today: "Today", later: "Later", expense: "Expenses", history: "History", done: "Done" },
+    clear: "Clear",
+    calendar: { titleToday: "Today", titleWeek: "This week", selectedDefault: "Pick a date to view tasks", selected: "tasks", monthView: "Month", weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], item: "items", overdue: "overdue" },
+    reminderActions: { complete: "Done", snooze: "Snooze 10 min", tomorrow: "Tomorrow", skip: "Skip this time" },
+    taskLabels: { noTime: "No time", expense: "Expense", uncategorized: "Uncategorized", currency: "CNY", remindPrefix: "", remindSuffix: "min before", repeatSuffix: "repeat", repeatLimit: "total", times: "times", reminded: "Reminded" },
+    buttons: { delete: "Delete", edit: "Edit" },
+    empty: "Nothing here yet.",
+    conflict: (count) => `${count} task groups are close in time and may conflict.`,
+    reminderMessage: (text, due) => `Reminder: ${text} (${due})`,
+    calcNumberOnly: "Numbers only",
+    calcBadFormat: "Invalid format",
+    calcUnknown: "Cannot calculate",
+    exported: (count) => `Exported ${count} records.`,
+    imported: (count) => `Imported ${count} records.`,
+    importFailed: "Import failed. Please choose a JSON backup file.",
+    emptyText: "Write something before saving.",
+    saved: "Saved.",
+    saveFailed: "Save failed. Refresh and try again.",
+    reminderOff: "Disabled. No sound or system notification will appear.",
+    reminderOn: "Enabled. Keep this page open to hear a sound and see a notification.",
+    pwaReady: "Ready to install. Installed mode still keeps data on this device.",
+    pwaInstalled: "Installed. Open it from the desktop icon; data still stays local.",
+    pwaInstallAccepted: "Installation started.",
+    pwaInstallDismissed: "Installation cancelled. You can install later.",
+    pwaFile: "Local file mode can use local data. Use local server or GitHub Pages for install and offline cache.",
+    pwaUnsupported: "This browser does not support install cache, but the page still works.",
+    pwaOfflineReady: "Offline support is ready. Install may appear in the browser menu or address bar.",
+    pwaOfflineFailed: "Offline cache is not enabled yet, but the page still works."
+  }
+};
+
+function t(key) {
+  return key.split(".").reduce((value, part) => value?.[part], messages[language]) ?? key;
+}
+
+function setPwaStatus(key) {
+  pwaMessageKey = key;
+  pwaStatus.textContent = t(key);
+}
+
+function setLabelText(control, text) {
+  const label = control.closest("label");
+  if (label?.firstChild) label.firstChild.textContent = `\n              ${text}\n              `;
+}
+
+function applyLanguage() {
+  document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
+  document.title = t("appTitle");
+  languageSelect.value = language;
+
+  document.querySelector(".eyebrow").textContent = t("appTitle");
+  document.querySelector("h1").textContent = t("hero");
+  modeButtons.forEach((button) => {
+    button.textContent = button.dataset.mode === "expense" ? t("modeExpense") : t("modeTask");
+  });
+  setMode(mode);
+
+  setLabelText(taskTags, t("labels.tags"));
+  setLabelText(reminderMinutesInput, t("labels.reminderLead"));
+  setLabelText(expenseAmount, t("labels.amount"));
+  setLabelText(expenseCategory, t("labels.category"));
+  setLabelText(repeatRule, t("labels.repeat"));
+  setLabelText(repeatCount, t("labels.repeatCount"));
+  document.querySelector('label[for="calculatorInput"]').textContent = t("labels.calculator");
+
+  taskTags.placeholder = t("placeholders.tags");
+  reminderMinutesInput.placeholder = t("placeholders.reminderLead");
+  expenseCategory.placeholder = t("placeholders.category");
+  repeatCount.placeholder = t("placeholders.repeatCount");
+  calculatorInput.placeholder = t("placeholders.calculator");
+  searchInput.placeholder = t("placeholders.search");
+
+  [...repeatRule.options].forEach((option) => {
+    option.textContent = t(`repeatOptions.${option.value}`);
+  });
+
+  sketchToggle.textContent = t("sketch");
+  cancelEdit.textContent = t("cancelEdit");
+  saveTask.textContent = editingTaskId ? t("saveEdit") : t("save");
+  clearSketch.textContent = t("clearSketch");
+  document.querySelector("#sketchPanel .hint").textContent = t("sketchHint");
+  document.querySelector("#parseHint").textContent = t("parseHint");
+
+  calculatorForm.querySelector("button").textContent = t("calculate");
+  if ([messages.zh.result, messages.en.result].includes(calculatorResult.textContent)) {
+    calculatorResult.textContent = t("result");
+  }
+
+  document.querySelector(".dataBar strong").textContent = t("dataTitle");
+  if ([messages.zh.dataStatusDefault, messages.en.dataStatusDefault].includes(dataStatus.textContent)) {
+    dataStatus.textContent = t("dataStatusDefault");
+  }
+  exportData.textContent = t("exportData");
+  importData.textContent = t("importData");
+
+  document.querySelector(".pwaBar strong").textContent = t("pwaTitle");
+  pwaStatus.textContent = t(pwaMessageKey);
+  installApp.textContent = t("install");
+
+  document.querySelector(".reminderBar strong").textContent = t("reminderTitle");
+  reminderStatus.textContent = remindersEnabled ? t("reminderOn") : t("reminderDefault");
+  enableReminders.textContent = remindersEnabled ? t("disableReminders") : t("enableReminders");
+
+  document.querySelector("#todayCount + span").textContent = t("summary.today");
+  document.querySelector("#laterCount + span").textContent = t("summary.later");
+  document.querySelector("#overdueCount + span").textContent = t("summary.overdue");
+  document.querySelector("#expenseTotal + span").textContent = t("summary.expenseTotal");
+  tabs.forEach((tab) => {
+    tab.textContent = t(`tabs.${tab.dataset.filter}`);
+  });
+  clearSearch.textContent = t("clear");
+
+  calendarToday.textContent = t("calendar.titleToday");
+  calendarWeek.textContent = t("calendar.titleWeek");
+  calendarMonth.textContent = t("calendar.monthView");
+  reminderActions.forEach((button) => {
+    button.textContent = t(`reminderActions.${button.dataset.reminderAction}`);
+  });
+
+  template.content.querySelector(".checkButton").setAttribute("aria-label", t("reminderActions.complete"));
+  template.content.querySelector(".sketchPreview").alt = language === "zh" ? "草图预览" : "Sketch preview";
+  template.content.querySelector(".deleteButton").textContent = t("buttons.delete");
+  template.content.querySelector(".deleteButton").setAttribute("aria-label", t("buttons.delete"));
+  template.content.querySelector(".editButton").textContent = t("buttons.edit");
+  template.content.querySelector(".editButton").setAttribute("aria-label", t("buttons.edit"));
+
+  render();
+}
 
 context.lineCap = "round";
 context.lineJoin = "round";
@@ -241,9 +500,9 @@ function chineseNumber(text) {
 }
 
 function formatDue(iso) {
-  if (!iso) return "没有时间";
+  if (!iso) return t("taskLabels.noTime");
   const date = new Date(iso);
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat(language === "zh" ? "zh-CN" : "en-US", {
     month: "numeric",
     day: "numeric",
     weekday: "short",
@@ -478,7 +737,7 @@ function renderConflicts() {
     return;
   }
   conflicts.hidden = false;
-  conflicts.textContent = `有 ${pairs.length} 组事情时间接近，可能会冲突。`;
+  conflicts.textContent = t("conflict")(pairs.length);
 }
 
 function tasksForDate(key) {
@@ -492,21 +751,21 @@ function renderCalendar() {
 
   if (calendarMode === "today") {
     days = [startOfDay(now)];
-    calendarTitle.textContent = "今天";
+    calendarTitle.textContent = t("calendar.titleToday");
   } else if (calendarMode === "week") {
     const start = addDays(startOfDay(now), -((now.getDay() + 6) % 7));
     days = Array.from({ length: 7 }, (_, index) => addDays(start, index));
-    calendarTitle.textContent = "本周";
+    calendarTitle.textContent = t("calendar.titleWeek");
   } else {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const offset = (monthStart.getDay() + 6) % 7;
     const gridStart = addDays(monthStart, -offset);
     days = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
-    calendarTitle.textContent = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long" }).format(now);
+    calendarTitle.textContent = new Intl.DateTimeFormat(language === "zh" ? "zh-CN" : "en-US", { year: "numeric", month: "long" }).format(now);
   }
 
   calendarGrid.innerHTML = "";
-  ["一", "二", "三", "四", "五", "六", "日"].forEach((label) => {
+  t("calendar.weekdays").forEach((label) => {
     const weekday = document.createElement("div");
     weekday.className = "calendarWeekday";
     weekday.textContent = label;
@@ -528,7 +787,7 @@ function renderCalendar() {
     if (dayTasks.length) {
       const count = document.createElement("span");
       count.className = `calendarCount ${overdue ? "warn" : ""}`;
-      count.textContent = overdue ? `${dayTasks.length} / ${overdue}过期` : `${dayTasks.length} 件`;
+      count.textContent = overdue ? `${dayTasks.length} / ${overdue} ${t("calendar.overdue")}` : `${dayTasks.length} ${t("calendar.item")}`;
       button.append(count);
     }
 
@@ -540,7 +799,9 @@ function renderCalendar() {
     calendarGrid.append(button);
   });
 
-  selectedDayLabel.textContent = selectedDateKey ? `${selectedDateKey} 的待办` : "选择日期查看事项";
+  selectedDayLabel.textContent = selectedDateKey
+    ? language === "zh" ? `${selectedDateKey} ${t("calendar.selected")}` : `${selectedDateKey} ${t("calendar.selected")}`
+    : t("calendar.selectedDefault");
   calendarToday.classList.toggle("active", calendarMode === "today");
   calendarWeek.classList.toggle("active", calendarMode === "week");
   calendarMonth.classList.toggle("active", calendarMode === "month");
@@ -556,7 +817,7 @@ function render() {
   tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.filter === filter));
 
   if (!visible.length) {
-    list.innerHTML = '<p class="empty">这里暂时没有事情。</p>';
+    list.innerHTML = `<p class="empty">${t("empty")}</p>`;
     return;
   }
 
@@ -578,38 +839,40 @@ function render() {
       const meta = node.querySelector(".meta");
       const pill = document.createElement("span");
       pill.className = `pill ${bucket(task) === "overdue" ? "warn" : ""}`;
-      pill.textContent = task.type === "expense" ? "记账" : formatDue(task.dueAt);
+      pill.textContent = task.type === "expense" ? t("taskLabels.expense") : formatDue(task.dueAt);
       meta.append(pill);
 
       if (task.type === "expense") {
         const moneyPill = document.createElement("span");
         moneyPill.className = "pill money";
-        moneyPill.textContent = `${task.category || "未分类"} ${Number(task.amount || 0).toFixed(2)} 元`;
+        moneyPill.textContent = `${task.category || t("taskLabels.uncategorized")} ${Number(task.amount || 0).toFixed(2)} ${t("taskLabels.currency")}`;
         meta.append(moneyPill);
       }
 
       if (task.dueAt && !task.done) {
         const remindPill = document.createElement("span");
         remindPill.className = "pill remindSoon";
-        remindPill.textContent = `提前 ${task.reminderMinutes ?? defaultReminderMinutes} 分钟提醒`;
+        remindPill.textContent = language === "zh"
+          ? `${t("taskLabels.remindPrefix")} ${task.reminderMinutes ?? defaultReminderMinutes} ${t("taskLabels.remindSuffix")}`
+          : `${task.reminderMinutes ?? defaultReminderMinutes} ${t("taskLabels.remindSuffix")}`;
         meta.append(remindPill);
       }
 
       if (task.repeat && task.repeat !== "none") {
         const repeatPill = document.createElement("span");
         repeatPill.className = "pill";
-        const repeatName = { daily: "每天", weekly: "每周", monthly: "每月" }[task.repeat];
-        const weekdayNames = ["日", "一", "二", "三", "四", "五", "六"];
+        const repeatName = t(`repeatOptions.${task.repeat}`);
+        const weekdayNames = language === "zh" ? ["日", "一", "二", "三", "四", "五", "六"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         const weekdays = task.weekdays?.length ? ` ${task.weekdays.map((day) => weekdayNames[day]).join("")}` : "";
-        const limit = task.repeatCount ? `，共 ${task.repeatCount} 次` : "";
-        repeatPill.textContent = `${repeatName}${weekdays}重复${limit}`;
+        const limit = task.repeatCount ? `, ${t("taskLabels.repeatLimit")} ${task.repeatCount} ${t("taskLabels.times")}` : "";
+        repeatPill.textContent = `${repeatName}${weekdays} ${t("taskLabels.repeatSuffix")}${limit}`;
         meta.append(repeatPill);
       }
 
       if (task.reminderHistory?.length) {
         const historyPill = document.createElement("span");
         historyPill.className = "pill";
-        historyPill.textContent = `已提醒 ${task.reminderHistory.length} 次`;
+        historyPill.textContent = `${t("taskLabels.reminded")} ${task.reminderHistory.length} ${t("taskLabels.times")}`;
         meta.append(historyPill);
       }
 
@@ -643,8 +906,8 @@ function setMode(nextMode) {
   mode = nextMode;
   modeButtons.forEach((item) => item.classList.toggle("active", item.dataset.mode === mode));
   expenseFields.hidden = mode !== "expense";
-  modeStatus.textContent = mode === "expense" ? "当前是记账模式，填写金额和分类后会计入本月支出。" : "当前是待办模式，可以记录提醒、重复事项和临时想法。";
-  textInput.placeholder = mode === "expense" ? "例如：买菜、咖啡、交通" : "例如：明天上午 10 点交电费；周五前回复老王；有空整理桌面";
+  modeStatus.textContent = mode === "expense" ? t("modeExpenseStatus") : t("modeTaskStatus");
+  textInput.placeholder = mode === "expense" ? t("expensePlaceholder") : t("taskPlaceholder");
 }
 
 function resetForm() {
@@ -656,7 +919,7 @@ function resetForm() {
   reminderMinutesInput.value = "";
   repeatRule.value = "none";
   repeatCount.value = "";
-  saveTask.textContent = "记下来";
+  saveTask.textContent = t("save");
   cancelEdit.hidden = true;
   setMode("task");
 }
@@ -671,7 +934,7 @@ function startEdit(task) {
   reminderMinutesInput.value = task.reminderMinutes ?? "";
   repeatRule.value = task.repeat || "none";
   repeatCount.value = task.repeatCount ?? "";
-  saveTask.textContent = "保存修改";
+  saveTask.textContent = t("saveEdit");
   cancelEdit.hidden = false;
   textInput.focus();
   form.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -711,14 +974,14 @@ function playReminderSound() {
 }
 
 function showReminder(task) {
-  const message = `提醒：${task.text}（${formatDue(task.dueAt)}）`;
+  const message = t("reminderMessage")(task.text, formatDue(task.dueAt));
   reminderNotice.hidden = false;
   reminderMessage.textContent = message;
   activeReminderTaskId = task.id;
   playReminderSound();
 
   if ("Notification" in window && Notification.permission === "granted") {
-    new Notification("个人待办提醒助手", { body: message });
+    new Notification(t("appTitle"), { body: message });
   }
 
   setTimeout(() => {
@@ -810,25 +1073,25 @@ async function checkReminders() {
 function calculateExpression() {
   const expression = calculatorInput.value.trim();
   if (!expression) {
-    calculatorResult.textContent = "结果";
+    calculatorResult.textContent = t("result");
     return;
   }
   if (!/^[\d+\-*/().\s]+$/.test(expression)) {
-    calculatorResult.textContent = "只能计算数字";
+    calculatorResult.textContent = t("calcNumberOnly");
     return;
   }
   try {
     const value = Function(`"use strict"; return (${expression})`)();
-    calculatorResult.textContent = Number.isFinite(value) ? String(Math.round(value * 100) / 100) : "算不出";
+    calculatorResult.textContent = Number.isFinite(value) ? String(Math.round(value * 100) / 100) : t("calcUnknown");
   } catch {
-    calculatorResult.textContent = "格式不对";
+    calculatorResult.textContent = t("calcBadFormat");
   }
 }
 
 function exportBackup() {
   const backup = {
     app: "personal-todo",
-    version: "0.5.0",
+    version: "0.5.1",
     exportedAt: new Date().toISOString(),
     tasks
   };
@@ -839,7 +1102,7 @@ function exportBackup() {
   link.download = `personal-todo-backup-${dateKey(new Date())}.json`;
   link.click();
   URL.revokeObjectURL(url);
-  dataStatus.textContent = `已导出 ${tasks.length} 条记录。`;
+  dataStatus.textContent = t("exported")(tasks.length);
 }
 
 async function importBackup(file) {
@@ -865,10 +1128,10 @@ async function importBackup(file) {
       tasks = cleaned;
       await localWriteTasks(tasks);
     }
-    dataStatus.textContent = `已导入 ${tasks.length} 条记录。`;
+    dataStatus.textContent = t("imported")(tasks.length);
     render();
   } catch {
-    dataStatus.textContent = "导入失败，请确认是 JSON 备份文件。";
+    dataStatus.textContent = t("importFailed");
   } finally {
     importFile.value = "";
   }
@@ -918,7 +1181,7 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const text = textInput.value.trim();
   if (!text) {
-    dataStatus.textContent = "请先写下要保存的内容。";
+    dataStatus.textContent = t("emptyText");
     return;
   }
 
@@ -961,10 +1224,10 @@ form.addEventListener("submit", async (event) => {
     searchInput.value = "";
     searchTerm = "";
     filter = selectedMode === "expense" ? "expense" : "active";
-    dataStatus.textContent = "已保存。";
+    dataStatus.textContent = t("saved");
     render();
   } catch {
-    dataStatus.textContent = "保存失败，请刷新页面后再试。";
+    dataStatus.textContent = t("saveFailed");
   }
 });
 
@@ -1042,8 +1305,8 @@ enableReminders.addEventListener("click", async () => {
   if (remindersEnabled) {
     remindersEnabled = false;
     audioReady = false;
-    reminderStatus.textContent = "已关闭。不会响铃，也不会弹出系统通知。";
-    enableReminders.textContent = "开启声音和弹窗";
+    reminderStatus.textContent = t("reminderOff");
+    enableReminders.textContent = t("enableReminders");
     enableReminders.classList.remove("active");
     return;
   }
@@ -1055,9 +1318,9 @@ enableReminders.addEventListener("click", async () => {
   if ("Notification" in window && Notification.permission === "default") {
     await Notification.requestPermission();
   }
-  enableReminders.textContent = "关闭声音和弹窗";
+  enableReminders.textContent = t("disableReminders");
   enableReminders.classList.add("active");
-  reminderStatus.textContent = "已开启。保持这个网页打开，到提醒时间会响一声并弹出提示。";
+  reminderStatus.textContent = t("reminderOn");
   checkReminders();
 });
 canvas.addEventListener("mousedown", beginDraw);
@@ -1071,43 +1334,50 @@ window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
   installPrompt = event;
   installApp.hidden = false;
-  pwaStatus.textContent = "可以安装到桌面。安装后像 App 一样打开，数据仍然只在本机。";
+  setPwaStatus("pwaReady");
 });
 
 window.addEventListener("appinstalled", () => {
   installPrompt = null;
   installApp.hidden = true;
-  pwaStatus.textContent = "已安装。可以从桌面图标打开，数据仍然只在本机。";
+  setPwaStatus("pwaInstalled");
 });
 
 installApp.addEventListener("click", async () => {
   if (!installPrompt) return;
   installPrompt.prompt();
   const result = await installPrompt.userChoice;
-  pwaStatus.textContent = result.outcome === "accepted" ? "已开始安装。" : "已取消安装，可以稍后再装。";
+  setPwaStatus(result.outcome === "accepted" ? "pwaInstallAccepted" : "pwaInstallDismissed");
   installPrompt = null;
   installApp.hidden = true;
 });
 
 async function registerPwa() {
   if (location.protocol === "file:") {
-    pwaStatus.textContent = "直接打开文件时可以使用本地数据；如需安装和离线缓存，请用本地服务或 GitHub Pages 打开。";
+    setPwaStatus("pwaFile");
     return;
   }
 
   if (!("serviceWorker" in navigator)) {
-    pwaStatus.textContent = "这个浏览器暂不支持安装缓存，但网页功能可以正常使用。";
+    setPwaStatus("pwaUnsupported");
     return;
   }
 
   try {
-    await navigator.serviceWorker.register("./sw.js?v=0.5.0");
-    pwaStatus.textContent = "已支持离线打开。安装入口会在浏览器菜单或地址栏出现。";
+    await navigator.serviceWorker.register("./sw.js?v=0.5.1");
+    setPwaStatus("pwaOfflineReady");
   } catch {
-    pwaStatus.textContent = "离线缓存暂时没有启用，但网页功能可以正常使用。";
+    setPwaStatus("pwaOfflineFailed");
   }
 }
 
+languageSelect.addEventListener("change", () => {
+  language = languageSelect.value;
+  localStorage.setItem(languageStorageKey, language);
+  applyLanguage();
+});
+
+applyLanguage();
 loadTasks();
 registerPwa();
 setInterval(checkReminders, 10000);

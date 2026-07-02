@@ -40,6 +40,26 @@ textarea {
   padding: 32px 0 56px;
 }
 
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.topBar label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.topBar select {
+  width: auto;
+  min-width: 108px;
+  min-height: 34px;
+  border-radius: 8px;
+}
+
 .capture {
   padding: 28px 0 18px;
 }
